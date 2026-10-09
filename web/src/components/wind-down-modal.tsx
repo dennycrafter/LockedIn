@@ -539,7 +539,7 @@ export default function WindDownSection() {
             <div className="flex items-center justify-between gap-4">
               <h2 className="text-base font-semibold text-[var(--fg)]">
                 Wind down
-                {isReady || isSaving ? <span className="ml-2 text-xs font-normal text-[var(--muted)]">Step {draft.step} of 8</span> : null}
+                {isReady || isSaving ? <span className="ml-2 text-xs font-normal text-[var(--muted)]">{draft.step > 0 ? `Step ${draft.step} of 8` : "Choose how to run it"}</span> : null}
               </h2>
               <button
                 type="button"
@@ -573,7 +573,7 @@ export default function WindDownSection() {
                     className="rounded-md px-4 py-1.5 text-sm font-medium text-white disabled:opacity-50"
                     style={{ background: "var(--accent)" }}
                   >
-                    Next
+                    {draft.step === 7 ? "Task list finished" : "Next"}
                   </button>
                 ) : (
                   <button
