@@ -1,5 +1,7 @@
 // T0 dashboard placeholder. The stats strip, projects and session panel land
 // in tickets T1 to T3.
+import EodSection from "@/components/EodPreviewModal";
+
 export const dynamic = "force-dynamic";
 
 export default function DashboardPage() {
@@ -20,6 +22,7 @@ export default function DashboardPage() {
       <div className="flex flex-1 items-center justify-center">
         <p className="text-[var(--muted)]">Welcome back. Panels arrive in the next tickets.</p>
       </div>
+      <EodSection />
     </main>
   );
 }
