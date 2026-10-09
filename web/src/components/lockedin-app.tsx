@@ -117,7 +117,6 @@ export function LockedInApp({ initialData }: { initialData: DashboardData }) {
         const state = (reply.data ?? {}) as {
           session?: ExtensionSession | null;
           softUnlockAt?: number | null;
-          softUnlockAt?: number | null;
           timeStudyPrompt?: { id: string } | null;
           floatEnabled?: boolean;
         };

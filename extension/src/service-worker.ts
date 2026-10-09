@@ -5,7 +5,7 @@
 // can never interleave (SPEC 4, SPEC 12). The session rules themselves live
 // in lib/lock-state.ts as pure functions; this file is the orchestration.
 
-import { ackQueue, drainQueue, enqueueSession, enqueueTimeStudy, queueIds } from "./lib/queue";
+import { ackQueue, drainQueue, enqueueInfraction, enqueueSession, enqueueTimeStudy, queueIds } from "./lib/queue";
 import { isUuid, toCompletedSession, type ActiveSession, type CompletedSession } from "./lib/session";
 import { applyBlockingRules, clearBlockingRules, isBlockingSession } from "./lib/blocking";
 import { sanitizeTree, type TreeState } from "./lib/tree";
@@ -204,8 +204,26 @@ async function expireDueSession(): Promise<ExpireResult> {
   if (result.completed) {
     await queueCompleted(result.completed);
     await saveLockState(result.state);
+    await notifySessionDone();
   }
   return result;
+}
+
+// "Session done" notification (SPEC 8.4). Fires from the one completion
+// funnel, so the alarm, a bridge message or a woken worker all notify once.
+async function notifySessionDone(): Promise<void> {
+  try {
+    await chrome.notifications.create("lockedin-session-done-" + String(Date.now()), {
+      type: "basic",
+      iconUrl: chrome.runtime.getURL("assets/icon128.png"),
+      title: "LockedIn",
+      message: "Session done",
+    });
+  } catch (error) {
+    // A missing permission or undisplayed notification must never break the
+    // session end itself; the dashboard panel still shows the result.
+    console.warn("LockedIn: could not show notification", error);
+  }
 }
 
 // Keeps DNR rules in sync with (active session, blocked sites): install the
@@ -337,6 +355,22 @@ async function route(method: string, payload: unknown): Promise<BridgeResponse> 
       const queue = await getQueue();
       await setQueue(enqueueTimeStudy(queue, { id, text: text.slice(0, 500), occurredAt: new Date().toISOString() }));
       await setTimeStudyPrompt(null);
+      return ok({ queued: true });
+    }
+    case "addManualInfraction": {
+      const raw = asRecord(payload)?.text;
+      const text = typeof raw === "string" ? raw.trim() : "";
+      if (text === "") return fail("Tell me what distracted you.");
+      if (text.length > 200) return fail("Keep it under 200 characters.");
+      const [queue, active] = await Promise.all([getQueue(), getActiveSession()]);
+      const infraction = {
+        id: crypto.randomUUID(),
+        sessionId: active?.id ?? null,
+        kind: "manual" as const,
+        detail: text,
+        occurredAt: new Date().toISOString(),
+      };
+      await setQueue(enqueueInfraction(queue, infraction));
       return ok({ queued: true });
     }
     case "setFloat": {

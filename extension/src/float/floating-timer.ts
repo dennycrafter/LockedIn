@@ -16,6 +16,7 @@ export interface FloatCallbacks {
   onAddTime: (seconds: number) => void;
   onHide: () => void;
   onPersistPosition: (position: { x: number; y: number }) => void;
+  onAddInfraction: (text: string) => Promise<{ ok: boolean; error?: string }>;
 }
 
 const STYLE = `
@@ -66,6 +67,27 @@ const STYLE = `
 .controls button:hover { border-color: #9a9aa3; }
 .header button { border: none; background: transparent; color: #9a9aa3; cursor: pointer; font: inherit; padding: 0 4px; }
 .warn { color: #ffb547; }
+.infraction { display: flex; gap: 6px; padding: 0 8px 8px; }
+.infraction input {
+  flex: 1;
+  min-width: 0;
+  background: #0b0b0d;
+  border: 1px solid #2a2a30;
+  border-radius: 6px;
+  color: #f2f2f4;
+  font: inherit;
+  padding: 3px 8px;
+}
+.infraction button {
+  background: transparent;
+  border: 1px solid #2a2a30;
+  border-radius: 6px;
+  color: #f2f2f4;
+  cursor: pointer;
+  font: inherit;
+  padding: 3px 8px;
+}
+.feedback { color: #ffb547; font-size: 11px; padding: 0 12px 6px; display: none; }
 `;
 
 function lockPill(lockMode: ActiveSession["lockMode"]): { background: string; color: string } {
@@ -125,7 +147,22 @@ export function createFloatingTimer(
   controls.className = "controls";
   controls.append(pauseResume, plus5, minus5);
 
-  box.append(header, digits, meta, controls);
+  const infractionInput = doc.createElement("input");
+  infractionInput.type = "text";
+  infractionInput.placeholder = "Got distracted by...";
+  infractionInput.setAttribute("aria-label", "What distracted you");
+  const infractionAdd = doc.createElement("button");
+  infractionAdd.type = "button";
+  infractionAdd.textContent = "Add";
+  infractionAdd.setAttribute("aria-label", "Record the manual infraction");
+  const infractionRow = doc.createElement("div");
+  infractionRow.className = "infraction";
+  infractionRow.append(infractionInput, infractionAdd);
+
+  const feedback = doc.createElement("div");
+  feedback.className = "feedback";
+
+  box.append(header, digits, meta, controls, infractionRow, feedback);
   doc.documentElement.appendChild(host);
 
   pauseResume.addEventListener("click", () => {
@@ -134,6 +171,24 @@ export function createFloatingTimer(
   plus5.addEventListener("click", () => callbacks.onAddTime(300));
   minus5.addEventListener("click", () => callbacks.onAddTime(-300));
   hide.addEventListener("click", () => callbacks.onHide());
+  infractionAdd.addEventListener("click", async () => {
+    const text = infractionInput.value.trim();
+    if (text === "") return;
+    const reply = await callbacks.onAddInfraction(text);
+    if (reply.ok) {
+      infractionInput.value = "";
+      feedback.style.display = "none";
+    } else {
+      feedback.textContent = reply.error ?? "Could not save it.";
+      feedback.style.display = "block";
+    }
+  });
+  infractionInput.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      void infractionAdd.click();
+    }
+  });
 
   // Drag by the header; movement and the final position are clamped to the
   // viewport, and the position is persisted on release (SPEC 8.6).

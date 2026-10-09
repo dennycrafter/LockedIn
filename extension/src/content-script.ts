@@ -60,6 +60,7 @@ async function initFloat(): Promise<void> {
       if (session) await chrome.storage.local.set({ floatHiddenFor: session.id });
     },
     onPersistPosition: (position) => void chrome.storage.local.set({ floatPosition: position }),
+    onAddInfraction: (text) => sendWorker("addManualInfraction", { text }),
   });
 
   const tick = async (): Promise<void> => {

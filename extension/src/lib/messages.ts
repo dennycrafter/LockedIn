@@ -18,6 +18,7 @@ export type BridgeMethod =
   | "requestEnd"
   | "cancelEnd"
   | "setFloat"
+  | "addManualInfraction"
   | "drainQueue"
   | "ackQueue"
   | "setTimeStudy"
