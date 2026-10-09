@@ -4,18 +4,23 @@
 // mutating handlers run inside one promise-chain lock so two woken messages
 // can never interleave (SPEC 4, SPEC 12).
 
-import { ackQueue, drainQueue, enqueueSession, queueIds } from "./lib/queue";
+import { ackQueue, drainQueue, enqueueSession, enqueueTimeStudy, queueIds } from "./lib/queue";
 import { isUuid, toCompletedSession, type ActiveSession } from "./lib/session";
 import { applyBlockingRules, clearBlockingRules, isBlockingSession } from "./lib/blocking";
 import { sanitizeTree, type TreeState } from "./lib/tree";
+import { TIME_STUDY_ALARM, isTimeStudyChoice, timeStudyAlarm } from "./lib/time-study";
 import {
   getActiveSession,
   getBlockedSites,
   getQueue,
+  getTimeStudyMinutes,
+  getTimeStudyPrompt,
   setActiveSession,
   setBlockedSites,
   setQueue,
   setTree,
+  setTimeStudyMinutes,
+  setTimeStudyPrompt,
 } from "./lib/storage";
 import { normalizeHostname } from "./lib/hostname";
 import type { BridgeResponse, LockMode, WorkerRequest } from "./lib/messages";
@@ -134,6 +139,19 @@ async function reassertBlocking(): Promise<void> {
   }
 }
 
+// Time study check-in (SPEC 8.11): the alarm fires with the dashboard closed,
+// so the prompt is persisted and picked up by the dashboard's getState poll,
+// and a Chrome notification asks the question right away.
+async function fireTimeStudyCheckIn(): Promise<void> {
+  await setTimeStudyPrompt({ id: crypto.randomUUID(), at: Date.now() });
+  chrome.notifications.create(TIME_STUDY_ALARM, {
+    type: "basic",
+    iconUrl: chrome.runtime.getURL("icons/icon-128.png"),
+    title: "LockedIn",
+    message: "What are you doing right now?",
+  });
+}
+
 // --- bridge dispatch -------------------------------------------------------
 
 async function handle(method: string, payload: unknown): Promise<BridgeResponse> {
@@ -177,8 +195,12 @@ async function route(method: string, payload: unknown): Promise<BridgeResponse> 
     case "startSession":
       return handleStartSession(payload);
     case "getState": {
-      const session = await getActiveSession();
-      return ok({ session, softUnlockAt: null });
+      const [session, timeStudyMinutes, timeStudyPrompt] = await Promise.all([
+        getActiveSession(),
+        getTimeStudyMinutes(),
+        getTimeStudyPrompt(),
+      ]);
+      return ok({ session, softUnlockAt: null, timeStudyMinutes, timeStudyPrompt });
     }
     case "drainQueue": {
       const queue = await getQueue();
@@ -196,6 +218,31 @@ async function route(method: string, payload: unknown): Promise<BridgeResponse> 
     }
     case "requestEnd":
       return handleRequestEnd();
+    case "setTimeStudy": {
+      const raw = asRecord(payload)?.minutes;
+      if (raw !== null && (typeof raw !== "number" || !Number.isInteger(raw) || !isTimeStudyChoice(raw))) {
+        return fail("minutes must be null or one of 5, 15, 30, 45, 60.");
+      }
+      await setTimeStudyMinutes(raw);
+      const alarm = timeStudyAlarm(raw);
+      if (alarm) {
+        await chrome.alarms.create(alarm.name, { periodInMinutes: alarm.periodInMinutes });
+      } else {
+        await chrome.alarms.clear(TIME_STUDY_ALARM);
+      }
+      return ok({ minutes: raw });
+    }
+    case "answerTimeStudy": {
+      const body = asRecord(payload);
+      const id = typeof body?.id === "string" ? body.id : null;
+      const text = typeof body?.text === "string" ? body.text.trim() : "";
+      if (!id || !isUuid(id)) return fail("Answer id must be a uuid.");
+      if (!text) return fail("Write what you are doing first.");
+      const queue = await getQueue();
+      await setQueue(enqueueTimeStudy(queue, { id, text: text.slice(0, 500), occurredAt: new Date().toISOString() }));
+      await setTimeStudyPrompt(null);
+      return ok({ queued: true });
+    }
     default:
       return fail(`Unknown method: ${method}`);
   }
@@ -213,6 +260,9 @@ chrome.alarms.onAlarm.addListener((alarm) => {
       await checkExpiredSession();
       await reassertBlocking();
     });
+  }
+  if (alarm.name === TIME_STUDY_ALARM) {
+    void withStateLock(fireTimeStudyCheckIn);
   }
 });
 

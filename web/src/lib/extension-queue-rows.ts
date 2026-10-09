@@ -2,7 +2,7 @@
 // drainQueue): field names match the extension protocol, not the database
 // columns. The dashboard is the bridge between the two, so it maps rows to
 // the persistence shape before POSTing /api/sync.
-import type { ParsedInfractionRow, ParsedSessionRow, ParsedSnippetRow } from "./sync-parse";
+import type { ParsedInfractionRow, ParsedSessionRow, ParsedSnippetRow, ParsedTimeStudyRow } from "./sync-parse";
 
 export interface DrainedSessionRow {
   id: string;
@@ -34,6 +34,12 @@ export interface DrainedSnippetRow {
   context: string;
   source: "page";
   createdAt: string; // ISO
+}
+
+export interface DrainedTimeStudyRow {
+  id: string;
+  text: string;
+  occurredAt: string; // ISO
 }
 
 export function toSessionRow(session: DrainedSessionRow): ParsedSessionRow {
@@ -71,5 +77,13 @@ export function toSnippetRow(snippet: DrainedSnippetRow): ParsedSnippetRow {
     context: snippet.context,
     source: snippet.source,
     created_at: snippet.createdAt,
+  };
+}
+
+export function toTimeStudyRow(entry: DrainedTimeStudyRow): ParsedTimeStudyRow {
+  return {
+    id: entry.id,
+    text: entry.text,
+    occurred_at: entry.occurredAt,
   };
 }

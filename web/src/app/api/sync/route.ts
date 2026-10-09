@@ -27,6 +27,7 @@ export async function POST(request: NextRequest) {
     sessions: payload.sessions.length,
     infractions: payload.infractions.length,
     snippets: payload.snippets.length,
+    time_studies: payload.time_studies.length,
   };
 
   if (payload.sessions.length > 0) {
@@ -73,6 +74,15 @@ export async function POST(request: NextRequest) {
       // The extension generates the ids and may replay a batch; a replay hits
       // the duplicate-ignore path, so reaching here is a real failure and the
       // queue stays for the next cycle.
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+  }
+
+  if (payload.time_studies.length > 0) {
+    const { error } = await client
+      .from("time_studies")
+      .upsert(payload.time_studies, { onConflict: "id", ignoreDuplicates: true });
+    if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
   }

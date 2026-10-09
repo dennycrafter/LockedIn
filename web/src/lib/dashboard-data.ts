@@ -11,6 +11,8 @@ export type CelebrationStyle = "dramatic" | "hype" | "calm";
 export interface SettingsData {
   display_name: string;
   completion_style: CelebrationStyle;
+  /** Time study check-in interval in minutes; null = off (SPEC 8.11). */
+  time_study_minutes: number | null;
 }
 
 export interface LinkData {
@@ -49,6 +51,26 @@ export interface ProjectData {
   tasks: TaskData[];
 }
 
+export interface MiscTaskData {
+  id: string;
+  title: string;
+  done: boolean;
+  position: number;
+}
+
+export interface OpenLoopData {
+  id: string;
+  kind: "loop" | "decision";
+  text: string;
+  created_at: string;
+}
+
+export interface TimeStudyEntryData {
+  id: string;
+  text: string;
+  occurred_at: string;
+}
+
 export interface BlockedSiteData {
   id: string;
   domain: string;
@@ -74,12 +96,19 @@ export interface DashboardData {
   settings: SettingsData;
   projects: ProjectData[];
   blockedSites: BlockedSiteData[];
+  openLoops: OpenLoopData[];
+  miscTasks: MiscTaskData[];
   todaySessions: SessionData[];
+  todayTimeStudies: TimeStudyEntryData[];
   todayInfractions: InfractionData[];
 }
 
 /** Defaults for a database where the settings row has not been inserted yet. */
-export const DEFAULT_SETTINGS: SettingsData = { display_name: "Boss", completion_style: "dramatic" };
+export const DEFAULT_SETTINGS: SettingsData = {
+  display_name: "Boss",
+  completion_style: "dramatic",
+  time_study_minutes: null,
+};
 
 interface LinkRow {
   id: string;
@@ -96,6 +125,20 @@ interface SnippetRow {
   content: string;
   context: string;
   created_at: string;
+}
+
+interface OpenLoopRow {
+  id: string;
+  kind: string;
+  text: string;
+  created_at: string;
+}
+
+interface MiscTaskRow {
+  id: string;
+  title: string;
+  done: boolean;
+  position: number;
 }
 
 interface TaskRow {
@@ -127,9 +170,9 @@ export async function loadDashboardData(): Promise<DashboardData> {
   const client = createServiceClient();
   const dayStart = chicagoTodayStart().toISOString();
 
-  const [settingsRes, projectsRes, tasksRes, linksRes, snippetsRes, sitesRes, sessionsRes, infractionsRes] =
+  const [settingsRes, projectsRes, tasksRes, linksRes, snippetsRes, sitesRes, loopsRes, miscRes, sessionsRes, infractionsRes, timeStudiesRes] =
     await Promise.all([
-      client.from("settings").select("display_name, completion_style").eq("id", 1).limit(1),
+      client.from("settings").select("display_name, completion_style, time_study_minutes").eq("id", 1).limit(1),
       client.from("projects").select("id, name, notes, position").order("position"),
       client
         .from("tasks")
@@ -141,6 +184,9 @@ export async function loadDashboardData(): Promise<DashboardData> {
         .select("id, owner_type, owner_id, content, context, created_at")
         .order("created_at", { ascending: false }),
       client.from("blocked_sites").select("id, domain").order("domain"),
+      // Newest first so the thing just parked sits at the top of its list.
+      client.from("open_loops").select("id, kind, text, created_at").order("created_at", { ascending: false }),
+      client.from("misc_tasks").select("id, title, done, position").order("position"),
       client
         .from("sessions")
         .select("id, project_id, task_id, active_seconds, started_at, ended_at")
@@ -151,11 +197,12 @@ export async function loadDashboardData(): Promise<DashboardData> {
         .select("id, kind, detail, occurred_at")
         .gte("occurred_at", dayStart)
         .order("occurred_at"),
+      client.from("time_studies").select("id, text, occurred_at").gte("occurred_at", dayStart).order("occurred_at"),
     ]);
 
   // A first-run database with no rows must render an empty dashboard, not an
   // error; individual query failures still surface.
-  for (const res of [settingsRes, projectsRes, tasksRes, linksRes, snippetsRes, sitesRes, sessionsRes, infractionsRes]) {
+  for (const res of [settingsRes, projectsRes, tasksRes, linksRes, snippetsRes, sitesRes, loopsRes, miscRes, sessionsRes, infractionsRes, timeStudiesRes]) {
     if (res.error) throw new Error(res.error.message);
   }
 
@@ -164,14 +211,18 @@ export async function loadDashboardData(): Promise<DashboardData> {
   const linkRows = (linksRes.data ?? []) as LinkRow[];
   const snippetRows = (snippetsRes.data ?? []) as SnippetRow[];
   const siteRows = sitesRes.data ?? [];
+  const loopRows = (loopsRes.data ?? []) as OpenLoopRow[];
+  const miscRows = (miscRes.data ?? []) as MiscTaskRow[];
   const sessionRows = sessionsRes.data ?? [];
   const infractionRows = infractionsRes.data ?? [];
+  const timeStudyRows = timeStudiesRes.data ?? [];
 
   const settingsRow = settingsRes.data?.[0];
   const settings: SettingsData = settingsRow
     ? {
         display_name: settingsRow.display_name,
         completion_style: settingsRow.completion_style as CelebrationStyle,
+        time_study_minutes: settingsRow.time_study_minutes ?? null,
       }
     : DEFAULT_SETTINGS;
 
@@ -243,6 +294,18 @@ export async function loadDashboardData(): Promise<DashboardData> {
       tasks: topTasksByProject.get(p.id) ?? [],
     })),
     blockedSites: siteRows.map((s) => ({ id: s.id, domain: s.domain })),
+    openLoops: loopRows.map((l) => ({
+      id: l.id,
+      kind: l.kind as OpenLoopData["kind"],
+      text: l.text,
+      created_at: l.created_at,
+    })),
+    miscTasks: miscRows.map((m) => ({
+      id: m.id,
+      title: m.title,
+      done: m.done,
+      position: m.position,
+    })),
     todaySessions: sessionRows.map((s) => ({
       id: s.id,
       project_id: s.project_id,
@@ -256,6 +319,11 @@ export async function loadDashboardData(): Promise<DashboardData> {
       kind: f.kind as InfractionData["kind"],
       detail: f.detail,
       occurred_at: f.occurred_at,
+    })),
+    todayTimeStudies: timeStudyRows.map((t) => ({
+      id: t.id,
+      text: t.text,
+      occurred_at: t.occurred_at,
     })),
   };
 }

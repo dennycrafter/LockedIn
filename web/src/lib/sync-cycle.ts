@@ -7,9 +7,11 @@ import {
   type DrainedInfractionRow,
   type DrainedSessionRow,
   type DrainedSnippetRow,
+  type DrainedTimeStudyRow,
   toInfractionRow,
   toSessionRow,
   toSnippetRow,
+  toTimeStudyRow,
 } from "@/lib/extension-queue-rows";
 
 export interface SyncCycleResult {
@@ -17,6 +19,7 @@ export interface SyncCycleResult {
   savedSessions: number;
   savedInfractions: number;
   savedSnippets: number;
+  savedTimeStudies: number;
   error?: string;
 }
 
@@ -35,17 +38,30 @@ function collectIds(items: unknown[]): string[] {
 export async function runSyncCycle(): Promise<SyncCycleResult> {
   const drained = await callExtension("drainQueue");
   if (!drained.ok) {
-    return { ok: false, savedSessions: 0, savedInfractions: 0, savedSnippets: 0, error: drained.error };
+    return {
+      ok: false,
+      savedSessions: 0,
+      savedInfractions: 0,
+      savedSnippets: 0,
+      savedTimeStudies: 0,
+      error: drained.error,
+    };
   }
-  const data = (drained.data ?? {}) as { sessions?: unknown; infractions?: unknown; snippets?: unknown };
+  const data = (drained.data ?? {}) as {
+    sessions?: unknown;
+    infractions?: unknown;
+    snippets?: unknown;
+    timeStudies?: unknown;
+  };
   // The extension speaks its own protocol shape (mirror types below); the
   // server re-validates every field strictly, so a malformed row is rejected
   // with a 400 and the queue is preserved.
   const sessions = Array.isArray(data.sessions) ? (data.sessions as DrainedSessionRow[]) : [];
   const infractions = Array.isArray(data.infractions) ? (data.infractions as DrainedInfractionRow[]) : [];
   const snippets = Array.isArray(data.snippets) ? (data.snippets as DrainedSnippetRow[]) : [];
-  if (sessions.length === 0 && infractions.length === 0 && snippets.length === 0) {
-    return { ok: true, savedSessions: 0, savedInfractions: 0, savedSnippets: 0 };
+  const timeStudies = Array.isArray(data.timeStudies) ? (data.timeStudies as DrainedTimeStudyRow[]) : [];
+  if (sessions.length === 0 && infractions.length === 0 && snippets.length === 0 && timeStudies.length === 0) {
+    return { ok: true, savedSessions: 0, savedInfractions: 0, savedSnippets: 0, savedTimeStudies: 0 };
   }
 
   const response = await fetch("/api/sync", {
@@ -55,6 +71,7 @@ export async function runSyncCycle(): Promise<SyncCycleResult> {
       sessions: sessions.map(toSessionRow),
       infractions: infractions.map(toInfractionRow),
       snippets: snippets.map(toSnippetRow),
+      time_studies: timeStudies.map(toTimeStudyRow),
     }),
   });
   if (!response.ok) {
@@ -64,20 +81,29 @@ export async function runSyncCycle(): Promise<SyncCycleResult> {
       savedSessions: 0,
       savedInfractions: 0,
       savedSnippets: 0,
+      savedTimeStudies: 0,
       error: `Saving the queue failed (${response.status}). ${text}`.slice(0, 300),
     };
   }
 
   const ack = await callExtension("ackQueue", {
-    ids: [...collectIds(sessions), ...collectIds(infractions), ...collectIds(snippets)],
+    ids: [...collectIds(sessions), ...collectIds(infractions), ...collectIds(snippets), ...collectIds(timeStudies)],
   });
   if (!ack.ok) {
-    return { ok: false, savedSessions: 0, savedInfractions: 0, savedSnippets: 0, error: ack.error };
+    return {
+      ok: false,
+      savedSessions: 0,
+      savedInfractions: 0,
+      savedSnippets: 0,
+      savedTimeStudies: 0,
+      error: ack.error,
+    };
   }
   return {
     ok: true,
     savedSessions: sessions.length,
     savedInfractions: infractions.length,
     savedSnippets: snippets.length,
+    savedTimeStudies: timeStudies.length,
   };
 }

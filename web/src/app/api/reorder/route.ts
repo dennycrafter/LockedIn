@@ -20,8 +20,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Body must be JSON." }, { status: 400 });
   }
   const raw = body as { kind?: unknown; orderedIds?: unknown };
-  if (raw.kind !== "projects" && raw.kind !== "tasks") {
-    return NextResponse.json({ error: "kind must be 'projects' or 'tasks'." }, { status: 400 });
+  if (raw.kind !== "projects" && raw.kind !== "tasks" && raw.kind !== "misc_tasks") {
+    return NextResponse.json({ error: "kind must be 'projects', 'tasks' or 'misc_tasks'." }, { status: 400 });
   }
   if (!Array.isArray(raw.orderedIds) || raw.orderedIds.length === 0 || raw.orderedIds.length > 500) {
     return NextResponse.json({ error: "orderedIds must be a non-empty list (max 500)." }, { status: 400 });
@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "orderedIds must be uuids." }, { status: 400 });
   }
 
-  const table = raw.kind === "projects" ? "projects" : "tasks";
+  const table = raw.kind === "projects" ? "projects" : raw.kind === "misc_tasks" ? "misc_tasks" : "tasks";
   const client = createServiceClient();
   // Sequential: keeps failure reporting simple, and reorder bursts are small.
   for (let position = 0; position < orderedIds.length; position++) {

@@ -12,12 +12,21 @@ const LOCK_CHOICES: LockMode[] = ["none", "soft", "hard"];
 
 export function StartSessionDialog({
   projects,
+  miscTask,
   onClose,
   onStart,
 }: {
   projects: ProjectData[];
+  /** Set when the timer was started from a misc task row (SPEC 8.9). */
+  miscTask?: { id: string; title: string } | null;
   onClose: () => void;
-  onStart: (spec: { projectId: string | null; taskId: string | null; minutes: number; lockMode: LockMode }) => void;
+  onStart: (spec: {
+    projectId: string | null;
+    taskId: string | null;
+    miscTaskId: string | null;
+    minutes: number;
+    lockMode: LockMode;
+  }) => void;
 }) {
   const [projectId, setProjectId] = useState<string>("");
   const [taskId, setTaskId] = useState<string>("");
@@ -41,14 +50,21 @@ export function StartSessionDialog({
           event.preventDefault();
           if (!minutesValid) return;
           onStart({
-            projectId: projectId || null,
-            taskId: taskId || null,
+            projectId: miscTask ? null : projectId || null,
+            taskId: miscTask ? null : taskId || null,
+            miscTaskId: miscTask ? miscTask.id : null,
             minutes: resolvedMinutes,
             lockMode,
           });
         }}
       >
-        <label className="block text-sm">
+        {miscTask ? (
+          <p className="text-sm text-[var(--fg)]">
+            Timer on: <span className="font-medium">{miscTask.title}</span> (misc task)
+          </p>
+        ) : (
+          <>
+            <label className="block text-sm">
           <span className="text-[var(--muted)]">Project (optional)</span>
           <select
             value={projectId}
@@ -83,6 +99,8 @@ export function StartSessionDialog({
             ))}
           </select>
         </label>
+          </>
+        )}
 
         <fieldset>
           <legend className="text-sm text-[var(--muted)]">Minutes</legend>
