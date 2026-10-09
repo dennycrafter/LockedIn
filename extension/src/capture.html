@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Add to LockedIn task notes</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #0b0b0d;
+        --surface: #121215;
+        --surface-2: #1c1c20;
+        --line: #2a2a30;
+        --fg: #f2f2f4;
+        --muted: #9a9aa3;
+        --silver: #e8e8ea;
+        --accent: #7c5cff;
+        --r: 8px;
+      }
+      body {
+        margin: 0;
+        padding: 16px;
+        background: var(--bg);
+        color: var(--fg);
+        font-family: -apple-system, "Segoe UI", Inter, sans-serif;
+        font-size: 14px;
+      }
+      h1 {
+        font-size: 15px;
+        margin: 0 0 12px;
+      }
+      .from {
+        color: var(--muted);
+        font-size: 12px;
+        margin: 0 0 12px;
+        overflow-wrap: break-word;
+      }
+      .preview {
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: var(--r);
+        padding: 8px 10px;
+        max-height: 110px;
+        overflow-y: auto;
+        white-space: pre-wrap;
+        color: var(--silver);
+        font-size: 12px;
+        margin: 0 0 12px;
+      }
+      label {
+        display: block;
+        color: var(--muted);
+        font-size: 12px;
+        margin-bottom: 12px;
+      }
+      select,
+      textarea {
+        display: block;
+        width: 100%;
+        box-sizing: border-box;
+        margin-top: 4px;
+        background: var(--bg);
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        color: var(--fg);
+        padding: 8px;
+        font: inherit;
+      }
+      textarea {
+        resize: vertical;
+        min-height: 56px;
+      }
+      .row {
+        display: flex;
+        justify-content: flex-end;
+        gap: 8px;
+      }
+      button {
+        background: var(--surface-2);
+        color: var(--fg);
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        padding: 8px 14px;
+        font: inherit;
+      }
+      button.primary {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: #fff;
+      }
+      button:disabled {
+        opacity: 0.5;
+      }
+      #status {
+        color: var(--muted);
+        font-size: 12px;
+        margin: 10px 0 0;
+      }
+      #status.error {
+        color: #ff6f66;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Add to task notes</h1>
+    <p id="captured-from" class="from"></p>
+    <p id="selection" class="preview"></p>
+    <label>
+      Attach to
+      <select id="target"></select>
+    </label>
+    <label>
+      Context (optional)
+      <textarea id="context" placeholder="Why this matters, or where to use it"></textarea>
+    </label>
+    <div class="row">
+      <button id="add" class="primary" type="button">Add</button>
+    </div>
+    <p id="status" role="status"></p>
+    <script src="capture.js"></script>
+  </body>
+</html>

@@ -3,7 +3,7 @@
 import * as esbuild from "esbuild";
 import { cpSync, mkdirSync } from "node:fs";
 
-const entryPoints = ["src/popup.ts", "src/service-worker.ts", "src/content-script.ts", "src/blocked.ts"];
+const entryPoints = ["src/popup.ts", "src/service-worker.ts", "src/content-script.ts", "src/blocked.ts", "src/capture.ts"];
 
 /** @type {import("esbuild").BuildOptions} */
 const options = {
@@ -28,5 +28,6 @@ if (process.argv.includes("--watch")) {
   cpSync("src/manifest.json", "dist/manifest.json");
   cpSync("src/popup.html", "dist/popup.html");
   cpSync("src/blocked.html", "dist/blocked.html");
+  cpSync("src/capture.html", "dist/capture.html");
   console.log("Extension built to dist/");
 }

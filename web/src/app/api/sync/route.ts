@@ -23,7 +23,11 @@ export async function POST(request: NextRequest) {
   }
 
   const client = createServiceClient();
-  const saved = { sessions: payload.sessions.length, infractions: payload.infractions.length };
+  const saved = {
+    sessions: payload.sessions.length,
+    infractions: payload.infractions.length,
+    snippets: payload.snippets.length,
+  };
 
   if (payload.sessions.length > 0) {
     const { error } = await client
@@ -58,6 +62,18 @@ export async function POST(request: NextRequest) {
       if (retry.error) {
         return NextResponse.json({ error: retry.error.message }, { status: 500 });
       }
+    }
+  }
+
+  if (payload.snippets.length > 0) {
+    const { error } = await client
+      .from("note_snippets")
+      .upsert(payload.snippets, { onConflict: "id", ignoreDuplicates: true });
+    if (error) {
+      // The extension generates the ids and may replay a batch; a replay hits
+      // the duplicate-ignore path, so reaching here is a real failure and the
+      // queue stays for the next cycle.
+      return NextResponse.json({ error: error.message }, { status: 500 });
     }
   }
 

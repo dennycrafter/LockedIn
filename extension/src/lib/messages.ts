@@ -9,6 +9,7 @@ export type LockMode = "none" | "soft" | "hard";
 export type BridgeMethod =
   | "ping"
   | "setBlockedSites"
+  | "setTree"
   | "startSession"
   | "getState"
   | "drainQueue"
@@ -32,6 +33,7 @@ export interface StatePayload {
 export interface DrainPayload {
   sessions: import("./session").CompletedSession[];
   infractions: import("./queue").QueuedInfraction[];
+  snippets: import("./queue").QueuedSnippet[];
 }
 
 // Reply envelope used both by the service worker to the content script and by

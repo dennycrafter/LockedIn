@@ -7,6 +7,7 @@
 import { ackQueue, drainQueue, enqueueSession, queueIds } from "./lib/queue";
 import { isUuid, toCompletedSession, type ActiveSession } from "./lib/session";
 import { applyBlockingRules, clearBlockingRules, isBlockingSession } from "./lib/blocking";
+import { sanitizeTree, type TreeState } from "./lib/tree";
 import {
   getActiveSession,
   getBlockedSites,
@@ -14,6 +15,7 @@ import {
   setActiveSession,
   setBlockedSites,
   setQueue,
+  setTree,
 } from "./lib/storage";
 import { normalizeHostname } from "./lib/hostname";
 import type { BridgeResponse, LockMode, WorkerRequest } from "./lib/messages";
@@ -21,6 +23,8 @@ import type { BridgeResponse, LockMode, WorkerRequest } from "./lib/messages";
 const SESSION_END_ALARM = "lockedin-session-end";
 const MAX_PLANNED_SECONDS = 180 * 60; // custom sessions top out at 3 hours (SPEC 8.4)
 const LOCK_MODES: LockMode[] = ["none", "soft", "hard"];
+const CONTEXT_MENU_ID = "lockedin-add-to-notes";
+const MAX_CAPTURE_CHARS = 5000; // selectionText cap for the picker window URL
 
 // --- bridge plumbing -------------------------------------------------------
 
@@ -162,6 +166,14 @@ async function route(method: string, payload: unknown): Promise<BridgeResponse> 
       await setBlockedSites(domains);
       return ok({ domains });
     }
+    case "setTree": {
+      // The dashboard pushes the full tree on load and on every change; the
+      // right-click picker reads this cache so it works with no tab open.
+      const tree = sanitizeTree(payload);
+      if (!tree) return fail("setTree needs a valid project tree.");
+      await setTree(tree);
+      return ok({ projects: tree.projects.length });
+    }
     case "startSession":
       return handleStartSession(payload);
     case "getState": {
@@ -204,6 +216,46 @@ chrome.alarms.onAlarm.addListener((alarm) => {
   }
 });
 
+// --- right-click capture (SPEC 8.7) ----------------------------------------
+
+// "Add to LockedIn task notes" on any selection opens the picker window with
+// the captured text and the page it came from. The picker queues the snippet
+// with source "page"; the dashboard flushes it through drainQueue.
+async function openCaptureWindow(params: { text: string; url: string; title: string }): Promise<void> {
+  const query = new URLSearchParams({
+    text: params.text.slice(0, MAX_CAPTURE_CHARS),
+    url: params.url,
+    title: params.title.slice(0, 200),
+  });
+  await chrome.windows.create({
+    url: `${chrome.runtime.getURL("capture.html")}?${query.toString()}`,
+    type: "popup",
+    width: 420,
+    height: 640,
+  });
+}
+
+chrome.contextMenus.onClicked.addListener((info, tab) => {
+  if (info.menuItemId !== CONTEXT_MENU_ID) return;
+  void openCaptureWindow({
+    text: info.selectionText ?? "",
+    url: tab?.url ?? "",
+    title: tab?.title ?? "",
+  });
+});
+
+// removeAll + create on install and update: the menu persists across browser
+// restarts, so this is the one place creation happens (no duplicate ids).
+function createContextMenus(): void {
+  chrome.contextMenus.removeAll(() => {
+    chrome.contextMenus.create({
+      id: CONTEXT_MENU_ID,
+      title: "Add to LockedIn task notes",
+      contexts: ["selection"],
+    });
+  });
+}
+
 // After install or browser restart, re-read state: expire a finished session
 // so a missed alarm cannot leave a stuck lock, and make the DNR rules match
 // what storage says.
@@ -215,6 +267,7 @@ async function reconcileOnWake(): Promise<void> {
 }
 
 chrome.runtime.onInstalled.addListener(() => {
+  createContextMenus();
   void reconcileOnWake();
 });
 

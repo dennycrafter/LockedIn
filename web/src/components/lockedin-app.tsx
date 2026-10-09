@@ -12,6 +12,7 @@ import type { ExtensionSession, LockMode } from "@/lib/extension-session";
 import { shouldCelebrate } from "@/lib/celebration";
 import { projectOfTask, projectProgress, withTaskDone } from "@/lib/tree";
 import { runSyncCycle } from "@/lib/sync-cycle";
+import { toExtensionTree } from "@/lib/extension-tree";
 import { BlockedSitesPanel } from "./blocked-sites-panel";
 import { CelebrationOverlay } from "./celebration-overlay";
 import { NotesPanel } from "./notes-panel";
@@ -63,6 +64,14 @@ export function LockedInApp({ initialData }: { initialData: DashboardData }) {
   const pushBlockedSites = useCallback((domains: string[]) => {
     void callExtension("setBlockedSites", { domains });
   }, []);
+
+  // Push the project tree to the extension (SPEC 8.17 setTree) so the
+  // right-click capture picker works with no dashboard tab open: on load and
+  // on every change, because refetchData refreshes this state.
+  useEffect(() => {
+    if (!data) return;
+    void callExtension("setTree", toExtensionTree(data.projects));
+  }, [data]);
 
   // Connection ping every 3s.
   useEffect(() => {

@@ -5,6 +5,7 @@ import { parseSyncPayload } from "./sync-parse";
 
 const SESSION_ID = "0b9e6c1e-0000-4000-8000-000000000001";
 const TASK_ID = "0b9e6c1e-0000-4000-8000-0000000000bb";
+const SNIPPET_ID = "0b9e6c1e-0000-4000-8000-0000000000cc";
 
 // Field mutators for the malformed-field cases; the casts live here so each
 // case reads as one line.
@@ -14,6 +15,10 @@ function firstSession(body: Record<string, unknown>): Record<string, unknown> {
 
 function firstInfraction(body: Record<string, unknown>): Record<string, unknown> {
   return (body.infractions as Record<string, unknown>[])[0];
+}
+
+function firstSnippet(body: Record<string, unknown>): Record<string, unknown> {
+  return (body.snippets as Record<string, unknown>[])[0];
 }
 
 function validBody(): Record<string, unknown> {
@@ -42,6 +47,17 @@ function validBody(): Record<string, unknown> {
         occurred_at: "2026-10-09T14:00:30.000Z",
       },
     ],
+    snippets: [
+      {
+        id: SNIPPET_ID,
+        owner_type: "task",
+        owner_id: TASK_ID,
+        content: "Pricing ships in v2.",
+        context: "Customer ask\nhttps://example.com/pricing-faq",
+        source: "page",
+        created_at: "2026-10-09T15:00:00.000Z",
+      },
+    ],
   };
 }
 
@@ -61,13 +77,62 @@ describe("parseSyncPayload", () => {
       kind: "site",
       detail: "youtube.com",
     });
+    expect(parsed?.snippets[0]).toMatchObject({
+      id: SNIPPET_ID,
+      owner_type: "task",
+      owner_id: TASK_ID,
+      source: "page",
+    });
   });
 
   it("accepts an empty batch", () => {
     expect(parseSyncPayload({ sessions: [], infractions: [] })).toEqual({
       sessions: [],
       infractions: [],
+      snippets: [],
     });
+  });
+
+  it("accepts a payload without snippets and defaults them to empty", () => {
+    const body = validBody();
+    delete body.snippets;
+    const parsed = parseSyncPayload(body);
+    expect(parsed).not.toBeNull();
+    expect(parsed?.snippets).toEqual([]);
+  });
+
+  it("rejects malformed snippet fields", () => {
+    const cases: Array<(body: Record<string, unknown>) => void> = [
+      (body) => {
+        firstSnippet(body).id = "not-a-uuid";
+      },
+      (body) => {
+        firstSnippet(body).owner_type = "note";
+      },
+      (body) => {
+        firstSnippet(body).owner_id = "also-not-a-uuid";
+      },
+      (body) => {
+        firstSnippet(body).content = "";
+      },
+      (body) => {
+        firstSnippet(body).content = "x".repeat(10_001);
+      },
+      (body) => {
+        firstSnippet(body).context = 7;
+      },
+      (body) => {
+        firstSnippet(body).source = "page2";
+      },
+      (body) => {
+        firstSnippet(body).created_at = "soon";
+      },
+    ];
+    for (const mutate of cases) {
+      const body = validBody();
+      mutate(body);
+      expect(parseSyncPayload(body)).toBeNull();
+    }
   });
 
   it("rejects non-uuid ids and malformed fields", () => {

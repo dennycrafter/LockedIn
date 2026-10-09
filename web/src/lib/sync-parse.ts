@@ -25,14 +25,31 @@ export interface ParsedInfractionRow {
   occurred_at: string;
 }
 
+// Right-click captures (SPEC 8.7): queued by the extension with source
+// "page", flushed by the dashboard through this route.
+export interface ParsedSnippetRow {
+  id: string;
+  owner_type: "project" | "task";
+  owner_id: string;
+  content: string;
+  context: string;
+  source: "manual" | "note" | "page" | "wind_down";
+  created_at: string;
+}
+
 export interface ParsedSyncPayload {
   sessions: ParsedSessionRow[];
   infractions: ParsedInfractionRow[];
+  snippets: ParsedSnippetRow[];
 }
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const LOCK_MODES = ["none", "soft", "hard"] as const;
 const INFRACTION_KINDS = ["site", "manual"] as const;
+const SNIPPET_OWNER_TYPES = ["project", "task"] as const;
+const SNIPPET_SOURCES = ["manual", "note", "page", "wind_down"] as const;
+const MAX_SNIPPET_CONTENT = 10_000;
+const MAX_SNIPPET_CONTEXT = 2_000;
 
 function isIsoTimestamp(value: unknown): value is string {
   return typeof value === "string" && !Number.isNaN(Date.parse(value));
@@ -48,6 +65,9 @@ export function parseSyncPayload(body: unknown): ParsedSyncPayload | null {
   const raw = body as Record<string, unknown>;
   if (raw.sessions === undefined || raw.infractions === undefined) return null;
   if (!Array.isArray(raw.sessions) || !Array.isArray(raw.infractions)) return null;
+  // Snippets arrived with the right-click capture (T4); older callers omit
+  // them, but a present-but-not-array value is still malformed.
+  if (raw.snippets !== undefined && !Array.isArray(raw.snippets)) return null;
 
   const sessions: ParsedSessionRow[] = [];
   for (const item of raw.sessions) {
@@ -100,5 +120,31 @@ export function parseSyncPayload(body: unknown): ParsedSyncPayload | null {
     });
   }
 
-  return { sessions, infractions };
+  const snippets: ParsedSnippetRow[] = [];
+  for (const item of raw.snippets ?? []) {
+    if (typeof item !== "object" || item === null) return null;
+    const n = item as Record<string, unknown>;
+    if (typeof n.id !== "string" || !UUID_PATTERN.test(n.id)) return null;
+    const ownerType = n.owner_type;
+    if (typeof ownerType !== "string" || !SNIPPET_OWNER_TYPES.includes(ownerType as never)) return null;
+    if (typeof n.owner_id !== "string" || !UUID_PATTERN.test(n.owner_id)) return null;
+    if (typeof n.content !== "string" || n.content.length === 0 || n.content.length > MAX_SNIPPET_CONTENT) {
+      return null;
+    }
+    if (typeof n.context !== "string" || n.context.length > MAX_SNIPPET_CONTEXT) return null;
+    const source = n.source;
+    if (typeof source !== "string" || !SNIPPET_SOURCES.includes(source as never)) return null;
+    if (!isIsoTimestamp(n.created_at)) return null;
+    snippets.push({
+      id: n.id,
+      owner_type: ownerType as ParsedSnippetRow["owner_type"],
+      owner_id: n.owner_id,
+      content: n.content,
+      context: n.context,
+      source: source as ParsedSnippetRow["source"],
+      created_at: n.created_at,
+    });
+  }
+
+  return { sessions, infractions, snippets };
 }
