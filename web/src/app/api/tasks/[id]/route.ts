@@ -4,7 +4,8 @@ import { createServiceClient } from "@/lib/supabase";
 
 export const dynamic = "force-dynamic";
 
-// Tick or untick a task (rename and reorder land with T2).
+// Tick, rename, or save item notes on a task or subtask (SPEC 8.2, 8.7).
+// Reorder is not here: the bulk /api/reorder route persists positions.
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   if (!(await isAuthed())) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -16,16 +17,37 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   } catch {
     return NextResponse.json({ error: "Body must be JSON." }, { status: 400 });
   }
-  const done = (body as { done?: unknown }).done;
-  if (typeof done !== "boolean") {
-    return NextResponse.json({ error: "done must be a boolean." }, { status: 400 });
+  const raw = body as { done?: unknown; title?: unknown; notes?: unknown };
+
+  const update: { done?: boolean; title?: string; notes?: string } = {};
+  if (raw.done !== undefined) {
+    if (typeof raw.done !== "boolean") {
+      return NextResponse.json({ error: "done must be a boolean." }, { status: 400 });
+    }
+    update.done = raw.done;
   }
+  if (raw.title !== undefined) {
+    if (typeof raw.title !== "string" || raw.title.trim() === "") {
+      return NextResponse.json({ error: "Task title is required." }, { status: 400 });
+    }
+    update.title = raw.title.trim().slice(0, 300);
+  }
+  if (raw.notes !== undefined) {
+    if (typeof raw.notes !== "string") {
+      return NextResponse.json({ error: "notes must be a string." }, { status: 400 });
+    }
+    update.notes = raw.notes.slice(0, 20000);
+  }
+  if (Object.keys(update).length === 0) {
+    return NextResponse.json({ error: "Nothing to update." }, { status: 400 });
+  }
+
   const client = createServiceClient();
   const { data, error } = await client
     .from("tasks")
-    .update({ done })
+    .update(update)
     .eq("id", id)
-    .select("id, project_id, title, done, position");
+    .select("id, project_id, parent_task_id, title, done, notes, position");
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }

@@ -31,3 +31,146 @@ body {
   outline: 2px solid var(--accent-ink);
   outline-offset: 2px;
 }
+
+/* Completion celebration (SPEC 8.10): one burst, then still. Confetti bits
+   take --angle and --distance from inline styles on each span. */
+.lockedin-celebration {
+  animation: lockedin-shake 0.5s ease-out 0.15s 1;
+}
+
+.lockedin-shockwave {
+  position: absolute;
+  left: 50%;
+  top: 40%;
+  width: 40px;
+  height: 40px;
+  margin: -20px 0 0 -20px;
+  border-radius: 9999px;
+  border: 2px solid var(--accent-ink);
+  opacity: 0;
+  animation: lockedin-shockwave 0.7s ease-out 0.1s 1 forwards;
+}
+
+.lockedin-sparks {
+  position: absolute;
+  left: 50%;
+  top: 40%;
+  width: 0;
+  height: 0;
+}
+
+.lockedin-sparks > span {
+  position: absolute;
+  width: 2px;
+  height: 14px;
+  border-radius: 1px;
+  transform: rotate(var(--angle)) translateY(-14px);
+  opacity: 0;
+  animation: lockedin-spark 0.6s ease-out 0.15s 1 forwards;
+}
+
+.lockedin-confetti {
+  position: absolute;
+  left: 50%;
+  top: 40%;
+  border-radius: 1px;
+  opacity: 0;
+  animation: lockedin-confetti 1.2s ease-out forwards;
+}
+
+.lockedin-slam {
+  animation: lockedin-slam 0.45s cubic-bezier(0.2, 1.4, 0.4, 1) 1;
+}
+
+@keyframes lockedin-shockwave {
+  from {
+    transform: scale(0.4);
+    opacity: 0.9;
+  }
+  to {
+    transform: scale(7);
+    opacity: 0;
+  }
+}
+
+@keyframes lockedin-spark {
+  0% {
+    opacity: 0;
+    transform: rotate(var(--angle)) translateY(-14px) scaleY(0.4);
+  }
+  30% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: rotate(var(--angle)) translateY(-44px) scaleY(1.2);
+  }
+}
+
+@keyframes lockedin-confetti {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) rotate(0deg) translateX(0);
+  }
+  10% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) rotate(var(--angle)) translateX(var(--distance)) translateY(60px);
+  }
+}
+
+@keyframes lockedin-slam {
+  0% {
+    transform: scale(1.6);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes lockedin-shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  20% {
+    transform: translateX(-4px);
+  }
+  40% {
+    transform: translateX(3px);
+  }
+  60% {
+    transform: translateX(-2px);
+  }
+  80% {
+    transform: translateX(1px);
+  }
+}
+
+/* Reduced motion (SPEC 10): fade the card in, no confetti flight, no shake. */
+@media (prefers-reduced-motion: reduce) {
+  .lockedin-celebration,
+  .lockedin-slam {
+    animation: lockedin-fade 0.4s ease-out 1;
+  }
+
+  .lockedin-shockwave,
+  .lockedin-confetti,
+  .lockedin-sparks > span {
+    animation: none;
+    opacity: 0;
+  }
+}
+
+@keyframes lockedin-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
