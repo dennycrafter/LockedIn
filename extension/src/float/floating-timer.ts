@@ -19,10 +19,14 @@ export interface FloatCallbacks {
   onAddInfraction: (text: string) => Promise<{ ok: boolean; error?: string }>;
 }
 
-const STYLE = `
+export const STYLE = `
 :host { all: initial; }
 * { box-sizing: border-box; margin: 0; padding: 0; }
 .box {
+  /* The host is pointer-events:none (its zero-size shell must never eat page
+     clicks), so the visible widget re-enables hit-testing for itself: without
+     this the whole widget is click-through inert (no drag, buttons or input). */
+  pointer-events: auto;
   position: fixed;
   z-index: 2147483647;
   width: 220px;
