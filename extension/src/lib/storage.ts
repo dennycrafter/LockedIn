@@ -13,6 +13,9 @@ const KEY_TREE = "tree";
 const KEY_SOFT_UNLOCK = "softUnlockAt";
 const KEY_TIME_STUDY_MINUTES = "timeStudyMinutes";
 const KEY_TIME_STUDY_PROMPT = "timeStudyPrompt";
+const KEY_FLOAT_ENABLED = "floatEnabled";
+const KEY_FLOAT_POSITION = "floatPosition";
+const KEY_FLOAT_HIDDEN_FOR = "floatHiddenFor";
 
 async function getValue<T>(key: string): Promise<T | undefined> {
   const bag = await chrome.storage.local.get(key);
@@ -105,4 +108,31 @@ export async function getTimeStudyPrompt(): Promise<TimeStudyPrompt | null> {
 export async function setTimeStudyPrompt(prompt: TimeStudyPrompt | null): Promise<void> {
   await setValue(KEY_TIME_STUDY_PROMPT, prompt);
 
+}
+
+/** Global "Float timer" toggle from the dashboard; on by default (SPEC 8.6). */
+export async function getFloatEnabled(): Promise<boolean> {
+  return (await getValue<boolean>(KEY_FLOAT_ENABLED)) ?? true;
+}
+
+export async function setFloatEnabled(enabled: boolean): Promise<void> {
+  await setValue(KEY_FLOAT_ENABLED, enabled);
+}
+
+/** Last drag position of the floating timer, top-left corner in px. */
+export async function getFloatPosition(): Promise<{ x: number; y: number } | null> {
+  return (await getValue<{ x: number; y: number }>(KEY_FLOAT_POSITION)) ?? null;
+}
+
+export async function setFloatPosition(position: { x: number; y: number }): Promise<void> {
+  await setValue(KEY_FLOAT_POSITION, position);
+}
+
+/** Session id the user hid the float for; a new session shows it again. */
+export async function getFloatHiddenFor(): Promise<string | null> {
+  return (await getValue<string>(KEY_FLOAT_HIDDEN_FOR)) ?? null;
+}
+
+export async function setFloatHiddenFor(sessionId: string | null): Promise<void> {
+  await setValue(KEY_FLOAT_HIDDEN_FOR, sessionId);
 }

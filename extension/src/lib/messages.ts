@@ -12,6 +12,12 @@ export type BridgeMethod =
   | "setTree"
   | "startSession"
   | "getState"
+  | "pause"
+  | "resume"
+  | "addTime"
+  | "requestEnd"
+  | "cancelEnd"
+  | "setFloat"
   | "drainQueue"
   | "ackQueue"
   | "setTimeStudy"
@@ -35,6 +41,8 @@ export interface StatePayload {
   timeStudyMinutes: number | null;
   /** Unanswered check-in; the dashboard shows the prompt for it. */
   timeStudyPrompt: import("./storage").TimeStudyPrompt | null;
+  /** Global "Float timer" toggle (SPEC 8.6). */
+  floatEnabled: boolean;
 }
 
 export interface DrainPayload {

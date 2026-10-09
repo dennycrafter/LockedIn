@@ -51,6 +51,8 @@ export function LockedInApp({ initialData }: { initialData: DashboardData }) {
   // True right after a session ends, so the main button reads "Start another
   // session" (SPEC 8.4) until a new one starts.
   const [justEnded, setJustEnded] = useState(false);
+  // Global "Float timer" toggle (SPEC 8.6), mirrored from the extension.
+  const [floatEnabled, setFloatEnabled] = useState(true);
   const [toast, setToast] = useState<string | null>(null);
   const [sitesError, setSitesError] = useState<string | null>(null);
   const [settingsError, setSettingsError] = useState<string | null>(null);
@@ -115,11 +117,14 @@ export function LockedInApp({ initialData }: { initialData: DashboardData }) {
         const state = (reply.data ?? {}) as {
           session?: ExtensionSession | null;
           softUnlockAt?: number | null;
+          softUnlockAt?: number | null;
           timeStudyPrompt?: { id: string } | null;
+          floatEnabled?: boolean;
         };
         setSession(state.session ?? null);
         setSoftUnlockAt(state.softUnlockAt ?? null);
         setTimeStudyPrompt(state.timeStudyPrompt ?? null);
+        if (typeof state.floatEnabled === "boolean") setFloatEnabled(state.floatEnabled);
       }
       setNowMs(Date.now());
     };
@@ -250,6 +255,16 @@ export function LockedInApp({ initialData }: { initialData: DashboardData }) {
   const controlSession = useCallback(
     async (method: "pause" | "resume" | "addTime" | "requestEnd" | "cancelEnd", payload?: unknown) => {
       const reply = await callExtension(method, payload);
+      if (!reply.ok) showToast(reply.error);
+    },
+    [showToast],
+  );
+
+  // Global "Float timer" toggle (SPEC 8.6): optimistic, reconciled by the poll.
+  const toggleFloat = useCallback(
+    async (enabled: boolean) => {
+      setFloatEnabled(enabled);
+      const reply = await callExtension("setFloat", { enabled });
       if (!reply.ok) showToast(reply.error);
     },
     [showToast],
@@ -567,6 +582,8 @@ export function LockedInApp({ initialData }: { initialData: DashboardData }) {
               session={session}
               nowMs={nowMs}
               softUnlockAtMs={softUnlockAt}
+              floatEnabled={floatEnabled}
+              onToggleFloat={toggleFloat}
               onControl={controlSession}
               onManualInfraction={addManualInfraction}
             />

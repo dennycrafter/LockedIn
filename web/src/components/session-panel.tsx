@@ -19,12 +19,16 @@ export function SessionPanel({
   session,
   nowMs,
   softUnlockAtMs,
+  floatEnabled,
+  onToggleFloat,
   onControl,
   onManualInfraction,
 }: {
   session: ExtensionSession;
   nowMs: number;
   softUnlockAtMs: number | null;
+  floatEnabled: boolean;
+  onToggleFloat: (enabled: boolean) => void;
   onControl: (method: "pause" | "resume" | "addTime" | "requestEnd" | "cancelEnd", payload?: unknown) => void;
   onManualInfraction: (text: string) => void;
 }) {
@@ -113,6 +117,17 @@ export function SessionPanel({
           </button>
         )}
       </div>
+
+      <label className="mt-3 flex items-center gap-2 text-sm text-[var(--muted)]">
+        <input
+          type="checkbox"
+          checked={floatEnabled}
+          onChange={(event) => onToggleFloat(event.target.checked)}
+          aria-label="Show the floating timer on other sites"
+          className="h-4 w-4 accent-[var(--accent)]"
+        />
+        Float timer
+      </label>
 
       <form
         className="mt-4 flex gap-2"

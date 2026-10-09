@@ -24,12 +24,14 @@ import {
 import {
   getActiveSession,
   getBlockedSites,
+  getFloatEnabled,
   getQueue,
   getSoftUnlockAt,
   getTimeStudyMinutes,
   getTimeStudyPrompt,
   setActiveSession,
   setBlockedSites,
+  setFloatEnabled,
   setQueue,
   setSoftUnlockAt,
   setTree,
@@ -274,12 +276,19 @@ async function route(method: string, payload: unknown): Promise<BridgeResponse> 
     case "startSession":
       return handleStartSession(payload);
     case "getState": {
-      const [lock, timeStudyMinutes, timeStudyPrompt] = await Promise.all([
+      const [lock, timeStudyMinutes, timeStudyPrompt, floatEnabled] = await Promise.all([
         loadLockState(),
         getTimeStudyMinutes(),
         getTimeStudyPrompt(),
+        getFloatEnabled(),
       ]);
-      return ok({ session: lock.session, softUnlockAt: lock.softUnlockAtMs, timeStudyMinutes, timeStudyPrompt });
+      return ok({
+        session: lock.session,
+        softUnlockAt: lock.softUnlockAtMs,
+        timeStudyMinutes,
+        timeStudyPrompt,
+        floatEnabled,
+      });
     }
     case "drainQueue": {
       const queue = await getQueue();
@@ -329,6 +338,12 @@ async function route(method: string, payload: unknown): Promise<BridgeResponse> 
       await setQueue(enqueueTimeStudy(queue, { id, text: text.slice(0, 500), occurredAt: new Date().toISOString() }));
       await setTimeStudyPrompt(null);
       return ok({ queued: true });
+    }
+    case "setFloat": {
+      const enabled = asRecord(payload)?.enabled;
+      if (typeof enabled !== "boolean") return fail("enabled must be a boolean.");
+      await setFloatEnabled(enabled);
+      return ok({ enabled });
     }
     default:
       return fail(`Unknown method: ${method}`);
