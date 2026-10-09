@@ -70,11 +70,18 @@ export function NoteEditor({
     onSavedRef.current?.({ ...note, body: next, updated_at: new Date().toISOString() });
   };
 
-  // Adopt the server body when the note switches or an outside edit arrives.
-  // After my own save the bodies match, so the caret is not disturbed.
+  // Adopt the server body when the note switches or an outside edit arrives
+  // (two-way sync with the pop out). After my own save the bodies match, so
+  // the caret is not disturbed; while a save is in flight, new keystrokes
+  // must win over the stale server row that just came back.
+  const noteIdRef = useRef(note.id);
   useEffect(() => {
-    setBody(note.body);
-    savedRef.current = note.body;
+    const switched = noteIdRef.current !== note.id;
+    noteIdRef.current = note.id;
+    if (switched || bodyRef.current === savedRef.current) {
+      setBody(note.body);
+      savedRef.current = note.body;
+    }
   }, [note.id, note.body]);
 
   // A pending save must not die with the editor (switching notes, pop out).

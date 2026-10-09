@@ -49,12 +49,21 @@ export function NotesPanel({
   }, [fetchNotes]);
 
   // Two-way sync for the pop out (SPEC 8.7): whoever refocuses refetches.
+  // Alt+Tab and taskbar switches fire "focus"; tab switches inside the same
+  // window fire "visibilitychange", so listen for both.
   useEffect(() => {
     const onFocus = () => {
       void fetchNotes();
     };
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void fetchNotes();
+    };
     window.addEventListener("focus", onFocus);
-    return () => window.removeEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
   }, [fetchNotes]);
 
   const selected = notes?.find((note) => note.id === selectedId) ?? null;
@@ -89,7 +98,16 @@ export function NotesPanel({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ body }),
         });
-        if (response.ok) return true;
+        if (response.ok) {
+          // Keep the list row (title, preview, date) in sync with what the
+          // server accepted; the server row also carries the new updated_at.
+          const payload = (await response.json().catch(() => ({}))) as { note?: NoteData };
+          if (payload.note) {
+            const saved = payload.note;
+            setNotes((prev) => (prev ?? []).map((note) => (note.id === saved.id ? saved : note)));
+          }
+          return true;
+        }
         const payload = (await response.json().catch(() => ({}))) as { error?: string };
         setError(payload.error ?? `Saving the note failed (${response.status})`);
         return false;

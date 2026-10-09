@@ -62,12 +62,20 @@ export function PopoutEditor({ noteId }: { noteId: string | null }) {
 
   // Two-way sync: an edit in the dashboard panel lands in the database, and
   // refocusing this window adopts it (and vice versa on the dashboard).
+  // Alt+Tab fires "focus"; tab switches fire "visibilitychange", so both.
   useEffect(() => {
     const onFocus = () => {
       void loadNote();
     };
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void loadNote();
+    };
     window.addEventListener("focus", onFocus);
-    return () => window.removeEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
   }, [loadNote]);
 
   useEffect(() => {
