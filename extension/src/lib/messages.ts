@@ -29,6 +29,7 @@ export interface StartSessionPayload {
 
 export interface StatePayload {
   session: import("./session").ActiveSession | null;
+  /** Deadline of the soft lock's 2 minute end countdown, epoch ms. */
   softUnlockAt: number | null;
   /** Check-in interval, null = off (SPEC 8.11). */
   timeStudyMinutes: number | null;

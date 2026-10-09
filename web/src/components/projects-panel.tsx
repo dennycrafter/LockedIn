@@ -46,6 +46,7 @@ export interface ProjectsPanelHandlers {
   onDeleteTask: (taskId: string) => void;
   onUpdateTaskNotes: (taskId: string, notes: string) => void;
   onStartTask: (taskId: string) => void;
+  onStartProject: (projectId: string) => void;
   onAddLink: (ownerType: "project" | "task", ownerId: string, name: string, url: string) => void;
   onDeleteLink: (linkId: string) => void;
 }
@@ -113,9 +114,11 @@ interface RowProps {
   depth: "task" | "subtask";
   handlers: ProjectsPanelHandlers;
   onOpenLinks: (owner: LinkOwner) => void;
+  /** A session is running, so the SPEC 8.4 one-session rule disables its timer button. */
+  sessionActive: boolean;
 }
 
-function TaskRow({ task, depth, handlers, onOpenLinks }: RowProps) {
+function TaskRow({ task, depth, handlers, onOpenLinks, sessionActive }: RowProps) {
   const { setNodeRef, setActivatorNodeRef, attributes, listeners, transform, transition, isDragging } =
     useSortable({ id: task.id });
   const [notesOpen, setNotesOpen] = useState(false);
@@ -124,7 +127,7 @@ function TaskRow({ task, depth, handlers, onOpenLinks }: RowProps) {
   const subtasks =
     depth === "task" ? (
       <div className="pb-2 pl-8">
-        <SubtaskDnd task={task} handlers={handlers} onOpenLinks={onOpenLinks} />
+        <SubtaskDnd task={task} handlers={handlers} onOpenLinks={onOpenLinks} sessionActive={sessionActive} />
         <form
           className="mt-1 flex gap-2"
           onSubmit={(event) => {
@@ -203,9 +206,10 @@ function TaskRow({ task, depth, handlers, onOpenLinks }: RowProps) {
         <button
           type="button"
           onClick={() => handlers.onStartTask(task.id)}
+          disabled={sessionActive}
           aria-label={`Start a session on ${task.title}`}
-          title="Start a session on this item"
-          className={ICON_BUTTON}
+          title={sessionActive ? "A session is already running" : "Start a session on this item"}
+          className={`${ICON_BUTTON} disabled:cursor-not-allowed disabled:opacity-40`}
         >
           ▶
         </button>
@@ -240,10 +244,12 @@ function SubtaskDnd({
   task,
   handlers,
   onOpenLinks,
+  sessionActive,
 }: {
   task: TaskData;
   handlers: ProjectsPanelHandlers;
   onOpenLinks: (owner: LinkOwner) => void;
+  sessionActive: boolean;
 }) {
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
@@ -266,7 +272,14 @@ function SubtaskDnd({
       <SortableContext items={subtaskIds} strategy={verticalListSortingStrategy}>
         <ul aria-label={`Subtasks of ${task.title}`}>
           {task.subtasks.map((sub) => (
-            <TaskRow key={sub.id} task={sub} depth="subtask" handlers={handlers} onOpenLinks={onOpenLinks} />
+            <TaskRow
+              key={sub.id}
+              task={sub}
+              depth="subtask"
+              handlers={handlers}
+              onOpenLinks={onOpenLinks}
+              sessionActive={sessionActive}
+            />
           ))}
         </ul>
       </SortableContext>
@@ -279,10 +292,12 @@ function TaskDnd({
   project,
   handlers,
   onOpenLinks,
+  sessionActive,
 }: {
   project: ProjectData;
   handlers: ProjectsPanelHandlers;
   onOpenLinks: (owner: LinkOwner) => void;
+  sessionActive: boolean;
 }) {
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
@@ -307,7 +322,14 @@ function TaskDnd({
       <SortableContext items={taskIds} strategy={verticalListSortingStrategy}>
         <ul aria-label={`Tasks in ${project.name}`}>
           {project.tasks.map((task) => (
-            <TaskRow key={task.id} task={task} depth="task" handlers={handlers} onOpenLinks={onOpenLinks} />
+            <TaskRow
+              key={task.id}
+              task={task}
+              depth="task"
+              handlers={handlers}
+              onOpenLinks={onOpenLinks}
+              sessionActive={sessionActive}
+            />
           ))}
         </ul>
       </SortableContext>
@@ -321,12 +343,14 @@ function ProjectBlock({
   onToggleCollapsed,
   handlers,
   onOpenLinks,
+  sessionActive,
 }: {
   project: ProjectData;
   collapsed: boolean;
   onToggleCollapsed: () => void;
   handlers: ProjectsPanelHandlers;
   onOpenLinks: (owner: LinkOwner) => void;
+  sessionActive: boolean;
 }) {
   const { setNodeRef, setActivatorNodeRef, attributes, listeners, transform, transition, isDragging } =
     useSortable({ id: project.id });
@@ -363,6 +387,16 @@ function ProjectBlock({
           className="text-sm font-medium"
         />
         <ProgressRing percent={progress.percent} label={project.name} />
+        <button
+          type="button"
+          onClick={() => handlers.onStartProject(project.id)}
+          disabled={sessionActive}
+          aria-label={`Start a session on ${project.name}`}
+          title={sessionActive ? "A session is already running" : "Start a session on this project"}
+          className={`${ICON_BUTTON} disabled:cursor-not-allowed disabled:opacity-40`}
+        >
+          ▶
+        </button>
         <button
           type="button"
           onClick={() => onOpenLinks({ ownerType: "project", ownerId: project.id, label: project.name })}
@@ -409,7 +443,7 @@ function ProjectBlock({
 
       {!collapsed && (
         <div className="border-t border-[var(--line)] px-3 py-2">
-          <TaskDnd project={project} handlers={handlers} onOpenLinks={onOpenLinks} />
+          <TaskDnd project={project} handlers={handlers} onOpenLinks={onOpenLinks} sessionActive={sessionActive} />
           <form
             className="mt-2 flex gap-2"
             onSubmit={(event) => {
@@ -447,10 +481,12 @@ export function ProjectsPanel({
   projects,
   handlers,
   addLinkError,
+  sessionActive,
 }: {
   projects: ProjectData[];
   handlers: ProjectsPanelHandlers;
   addLinkError: string | null;
+  sessionActive: boolean;
 }) {
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
@@ -530,6 +566,7 @@ export function ProjectsPanel({
                   onToggleCollapsed={() => toggleCollapsed(project.id)}
                   handlers={handlers}
                   onOpenLinks={setLinksOwner}
+                  sessionActive={sessionActive}
                 />
               ))}
             </div>

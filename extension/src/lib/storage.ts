@@ -10,6 +10,7 @@ const KEY_BLOCKED_SITES = "blockedSites";
 const KEY_DASHBOARD_ORIGIN = "dashboardOrigin";
 const KEY_QUEUE = "queue";
 const KEY_TREE = "tree";
+const KEY_SOFT_UNLOCK = "softUnlockAt";
 const KEY_TIME_STUDY_MINUTES = "timeStudyMinutes";
 const KEY_TIME_STUDY_PROMPT = "timeStudyPrompt";
 
@@ -72,6 +73,15 @@ export async function setTree(tree: TreeState): Promise<void> {
   await setValue(KEY_TREE, tree);
 }
 
+/** Deadline of the soft lock's 2 minute end countdown; null when not ending. */
+export async function getSoftUnlockAt(): Promise<number | null> {
+  return (await getValue<number>(KEY_SOFT_UNLOCK)) ?? null;
+}
+
+export async function setSoftUnlockAt(softUnlockAtMs: number | null): Promise<void> {
+  await setValue(KEY_SOFT_UNLOCK, softUnlockAtMs);
+}
+
 // --- time study (SPEC 8.11) ------------------------------------------------
 
 export interface TimeStudyPrompt {
@@ -94,4 +104,5 @@ export async function getTimeStudyPrompt(): Promise<TimeStudyPrompt | null> {
 
 export async function setTimeStudyPrompt(prompt: TimeStudyPrompt | null): Promise<void> {
   await setValue(KEY_TIME_STUDY_PROMPT, prompt);
+
 }

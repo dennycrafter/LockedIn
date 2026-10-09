@@ -2,22 +2,36 @@
 // commands from the content script. MV3 workers sleep, so every read and
 // write goes through chrome.storage.local, timers are chrome.alarms, and all
 // mutating handlers run inside one promise-chain lock so two woken messages
-// can never interleave (SPEC 4, SPEC 12).
+// can never interleave (SPEC 4, SPEC 12). The session rules themselves live
+// in lib/lock-state.ts as pure functions; this file is the orchestration.
 
 import { ackQueue, drainQueue, enqueueSession, enqueueTimeStudy, queueIds } from "./lib/queue";
-import { isUuid, toCompletedSession, type ActiveSession } from "./lib/session";
+import { isUuid, toCompletedSession, type ActiveSession, type CompletedSession } from "./lib/session";
 import { applyBlockingRules, clearBlockingRules, isBlockingSession } from "./lib/blocking";
 import { sanitizeTree, type TreeState } from "./lib/tree";
 import { TIME_STUDY_ALARM, isTimeStudyChoice, timeStudyAlarm } from "./lib/time-study";
 import {
+  ADD_TIME_STEP_SECONDS,
+  addTimeToSession,
+  cancelEnd,
+  expire,
+  pauseLockState,
+  requestEnd,
+  resumeLockState,
+  type ExpireResult,
+  type LockState,
+} from "./lib/lock-state";
+import {
   getActiveSession,
   getBlockedSites,
   getQueue,
+  getSoftUnlockAt,
   getTimeStudyMinutes,
   getTimeStudyPrompt,
   setActiveSession,
   setBlockedSites,
   setQueue,
+  setSoftUnlockAt,
   setTree,
   setTimeStudyMinutes,
   setTimeStudyPrompt,
@@ -26,6 +40,7 @@ import { normalizeHostname } from "./lib/hostname";
 import type { BridgeResponse, LockMode, WorkerRequest } from "./lib/messages";
 
 const SESSION_END_ALARM = "lockedin-session-end";
+const SOFT_UNLOCK_ALARM = "lockedin-soft-unlock";
 const MAX_PLANNED_SECONDS = 180 * 60; // custom sessions top out at 3 hours (SPEC 8.4)
 const LOCK_MODES: LockMode[] = ["none", "soft", "hard"];
 const CONTEXT_MENU_ID = "lockedin-add-to-notes";
@@ -52,6 +67,39 @@ function withStateLock<T>(fn: () => Promise<T>): Promise<T> {
   const run = stateLock.then(fn);
   stateLock = run.catch(() => undefined);
   return run;
+}
+
+// --- lock state persistence ------------------------------------------------
+
+async function loadLockState(): Promise<LockState> {
+  const [session, softUnlockAtMs] = await Promise.all([getActiveSession(), getSoftUnlockAt()]);
+  return { session, softUnlockAtMs };
+}
+
+async function saveLockState(state: LockState): Promise<void> {
+  await Promise.all([setActiveSession(state.session), setSoftUnlockAt(state.softUnlockAtMs)]);
+  await syncAlarms(state);
+}
+
+// One alarm per deadline. Creating an alarm with an existing name replaces it,
+// so re-syncing after every mutation keeps the deadlines exact even when a
+// previous fire was missed while the worker slept.
+async function syncAlarms(state: LockState): Promise<void> {
+  if (state.session) {
+    await chrome.alarms.create(SESSION_END_ALARM, { when: state.session.endAtMs });
+  } else {
+    await chrome.alarms.clear(SESSION_END_ALARM);
+  }
+  if (state.session && state.softUnlockAtMs !== null) {
+    await chrome.alarms.create(SOFT_UNLOCK_ALARM, { when: state.softUnlockAtMs });
+  } else {
+    await chrome.alarms.clear(SOFT_UNLOCK_ALARM);
+  }
+}
+
+async function queueCompleted(completed: CompletedSession): Promise<void> {
+  const queue = await getQueue();
+  await setQueue(enqueueSession(queue, completed));
 }
 
 // --- session lifecycle -----------------------------------------------------
@@ -91,45 +139,76 @@ async function handleStartSession(payload: unknown): Promise<BridgeResponse> {
     pausedAtMs: null,
     pausedTotalMs: 0,
   };
-  await setActiveSession(session);
-  await chrome.alarms.create(SESSION_END_ALARM, { when: session.endAtMs });
+  await saveLockState({ session, softUnlockAtMs: null });
   return ok({ session });
 }
 
-// Queues the completed session, drops the alarm and unblocks (SPEC 8.4). The
-// soft lock's 2 minute tail arrives in T3; until then a soft session ends
-// immediately on request.
-async function endSession(nowMs: number): Promise<void> {
-  const session = await getActiveSession();
-  if (!session) return;
-  const endedAtMs = Math.min(nowMs, session.endAtMs);
-  const queue = await getQueue();
-  await setQueue(enqueueSession(queue, toCompletedSession(session, endedAtMs)));
-  await setActiveSession(null);
-  await chrome.alarms.clear(SESSION_END_ALARM);
-}
-
+// "End session" (SPEC 8.4): none ends on the spot, soft starts the 2 minute
+// countdown with blocking kept on, hard is refused by the state machine.
 async function handleRequestEnd(): Promise<BridgeResponse> {
-  const session = await getActiveSession();
-  if (!session) return fail("No session is running.");
-  if (session.lockMode === "hard") {
-    return fail("Hard lock: the session ends when the timer reaches zero.");
+  const before = await loadLockState();
+  const result = requestEnd(before, Date.now());
+  if (result.error) return fail(result.error);
+  if (result.ended && before.session) {
+    await queueCompleted(toCompletedSession(before.session, Date.now()));
   }
-  await endSession(Date.now());
-  return ok({ ended: true });
+  await saveLockState(result.state);
+  return ok({ ended: result.ended, softUnlockAt: result.state.softUnlockAtMs });
 }
 
-// The alarm may fire late or be missed while the worker sleeps, so every
-// incoming message also checks for an expired session.
-async function checkExpiredSession(): Promise<void> {
-  const session = await getActiveSession();
-  if (session && session.pausedAtMs === null && Date.now() >= session.endAtMs) {
-    await endSession(session.endAtMs);
+async function handlePause(): Promise<BridgeResponse> {
+  const state = await loadLockState();
+  if (!state.session) return fail("No session is running.");
+  const next = pauseLockState(state, Date.now());
+  await saveLockState(next);
+  return ok({ session: next.session });
+}
+
+async function handleResume(): Promise<BridgeResponse> {
+  const state = await loadLockState();
+  if (!state.session) return fail("No session is running.");
+  const next = resumeLockState(state, Date.now());
+  await saveLockState(next);
+  return ok({ session: next.session });
+}
+
+async function handleAddTime(payload: unknown): Promise<BridgeResponse> {
+  const seconds = asRecord(payload)?.seconds;
+  if (seconds !== ADD_TIME_STEP_SECONDS && seconds !== -ADD_TIME_STEP_SECONDS) {
+    return fail("addTime needs seconds of 300 or -300.");
   }
+  const state = await loadLockState();
+  if (!state.session) return fail("No session is running.");
+  const next: LockState = { ...state, session: addTimeToSession(state.session, seconds) };
+  await saveLockState(next);
+  return ok({ session: next.session });
+}
+
+async function handleCancelEnd(): Promise<BridgeResponse> {
+  const state = await loadLockState();
+  if (!state.session) return fail("No session is running.");
+  const next = cancelEnd(state);
+  await saveLockState(next);
+  return ok({ softUnlockAt: next.softUnlockAtMs });
+}
+
+/**
+ * End the session when one of its deadlines has passed. The alarm may fire
+ * late or be missed while the worker sleeps, so every incoming message also
+ * runs this before acting.
+ */
+async function expireDueSession(): Promise<ExpireResult> {
+  const result = expire(await loadLockState(), Date.now());
+  if (result.completed) {
+    await queueCompleted(result.completed);
+    await saveLockState(result.state);
+  }
+  return result;
 }
 
 // Keeps DNR rules in sync with (active session, blocked sites): install the
 // per-domain redirects while a soft/hard session runs, remove them otherwise.
+// A paused session or a running soft end countdown keeps blocking.
 async function reassertBlocking(): Promise<void> {
   const [session, domains] = await Promise.all([getActiveSession(), getBlockedSites()]);
   if (isBlockingSession(session)) {
@@ -158,7 +237,7 @@ async function handle(method: string, payload: unknown): Promise<BridgeResponse>
   return withStateLock(async () => {
     // The alarm may fire late or be missed while the worker sleeps, so every
     // message also checks for an expired session before acting.
-    await checkExpiredSession();
+    await expireDueSession();
     const response = await route(method, payload);
     // State may have changed above; make the DNR rules match it.
     await reassertBlocking();
@@ -195,12 +274,12 @@ async function route(method: string, payload: unknown): Promise<BridgeResponse> 
     case "startSession":
       return handleStartSession(payload);
     case "getState": {
-      const [session, timeStudyMinutes, timeStudyPrompt] = await Promise.all([
-        getActiveSession(),
+      const [lock, timeStudyMinutes, timeStudyPrompt] = await Promise.all([
+        loadLockState(),
         getTimeStudyMinutes(),
         getTimeStudyPrompt(),
       ]);
-      return ok({ session, softUnlockAt: null, timeStudyMinutes, timeStudyPrompt });
+      return ok({ session: lock.session, softUnlockAt: lock.softUnlockAtMs, timeStudyMinutes, timeStudyPrompt });
     }
     case "drainQueue": {
       const queue = await getQueue();
@@ -216,8 +295,16 @@ async function route(method: string, payload: unknown): Promise<BridgeResponse> 
       await setQueue(next);
       return ok({ remaining: queueIds(next).length });
     }
+    case "pause":
+      return handlePause();
+    case "resume":
+      return handleResume();
+    case "addTime":
+      return handleAddTime(payload);
     case "requestEnd":
       return handleRequestEnd();
+    case "cancelEnd":
+      return handleCancelEnd();
     case "setTimeStudy": {
       const raw = asRecord(payload)?.minutes;
       if (raw !== null && (typeof raw !== "number" || !Number.isInteger(raw) || !isTimeStudyChoice(raw))) {
@@ -255,15 +342,15 @@ chrome.runtime.onMessage.addListener((request: WorkerRequest, _sender, sendRespo
 });
 
 chrome.alarms.onAlarm.addListener((alarm) => {
-  if (alarm.name === SESSION_END_ALARM) {
-    void withStateLock(async () => {
-      await checkExpiredSession();
-      await reassertBlocking();
-    });
-  }
   if (alarm.name === TIME_STUDY_ALARM) {
     void withStateLock(fireTimeStudyCheckIn);
+    return;
   }
+  if (alarm.name !== SESSION_END_ALARM && alarm.name !== SOFT_UNLOCK_ALARM) return;
+  void withStateLock(async () => {
+    await expireDueSession();
+    await reassertBlocking();
+  });
 });
 
 // --- right-click capture (SPEC 8.7) ----------------------------------------
@@ -311,7 +398,7 @@ function createContextMenus(): void {
 // what storage says.
 async function reconcileOnWake(): Promise<void> {
   await withStateLock(async () => {
-    await checkExpiredSession();
+    await expireDueSession();
     await reassertBlocking();
   });
 }
