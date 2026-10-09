@@ -6,7 +6,9 @@ create table settings (
   completion_style text not null default 'dramatic' check (completion_style in ('dramatic','hype','calm')),
   time_study_minutes int check (time_study_minutes in (5,15,30,45,60)),
   default_minutes int not null default 25,
-  default_lock text not null default 'hard' check (default_lock in ('none','soft','hard'))
+  default_lock text not null default 'hard' check (default_lock in ('none','soft','hard')),
+  -- optional evening reminder target for the wind down card, e.g. "21:30"
+  wind_down_time text not null default ''
 );
 insert into settings (id) values (1);
 
@@ -144,3 +146,8 @@ do $$ declare t text; begin
     execute format('grant all on table %I to service_role', t);
   end loop;
 end $$;
+
+-- Wind down setting (T6a-1): idempotent, safe for databases that already ran
+-- the original script.
+alter table settings add column if not exists wind_down_time text not null default '';
+grant all on table settings to service_role;

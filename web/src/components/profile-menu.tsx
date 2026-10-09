@@ -1,7 +1,8 @@
 "use client";
 
-// Profile menu (SPEC 10 top bar): Display name and Completion message here;
-// Lock is the existing logout. Helper mode arrives with T8.
+// Profile menu (SPEC 10 top bar): Display name, Completion message and the
+// wind-down time target (SPEC 8.12) here; Lock is the existing logout. Helper
+// mode arrives with T8.
 
 import { useEffect, useRef, useState } from "react";
 import type { CelebrationStyle, SettingsData } from "@/lib/dashboard-data";
@@ -20,15 +21,17 @@ export function ProfileMenu({
 }: {
   settings: SettingsData;
   error: string | null;
-  onSave: (next: { display_name?: string; completion_style?: CelebrationStyle }) => void;
+  onSave: (next: { display_name?: string; completion_style?: CelebrationStyle; wind_down_time?: string }) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [nameDraft, setNameDraft] = useState(settings.display_name);
+  const [timeDraft, setTimeDraft] = useState(settings.wind_down_time);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setNameDraft(settings.display_name);
-  }, [settings.display_name]);
+    setTimeDraft(settings.wind_down_time);
+  }, [settings.display_name, settings.wind_down_time]);
 
   useEffect(() => {
     if (!open) return;
@@ -114,6 +117,34 @@ export function ProfileMenu({
               {celebrationMessage(settings.completion_style, settings.display_name)}
             </p>
           </fieldset>
+
+          <form
+            className="mt-4 border-t border-[var(--line)] pt-3"
+            onSubmit={(event) => {
+              event.preventDefault();
+              const next = timeDraft.trim();
+              if (next !== settings.wind_down_time) onSave({ wind_down_time: next });
+            }}
+          >
+            <label className="block text-sm">
+              <span className="text-[var(--muted)]">Wind down time</span>
+              <input
+                type="text"
+                value={timeDraft}
+                onChange={(event) => setTimeDraft(event.target.value)}
+                placeholder="21:30"
+                aria-label="Wind down time"
+                className="mt-1 w-full rounded-md border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--fg)] placeholder:text-[var(--muted)]"
+              />
+            </label>
+            <button
+              type="submit"
+              disabled={timeDraft.trim() === settings.wind_down_time}
+              className="mt-2 w-full rounded-md border border-[var(--line)] px-3 py-1.5 text-sm text-[var(--fg)] hover:border-[var(--muted)] disabled:opacity-50"
+            >
+              Save wind down time
+            </button>
+          </form>
 
           {error && <p className="mt-3 text-sm text-[var(--bad)]">{error}</p>}
 
