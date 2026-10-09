@@ -16,6 +16,7 @@ import { toExtensionTree } from "@/lib/extension-tree";
 import { BlockedSitesPanel } from "./blocked-sites-panel";
 import { CelebrationOverlay } from "./celebration-overlay";
 import { NotesPanel } from "./notes-panel";
+import { OpenLoopsPanel } from "./open-loops-panel";
 import { ProfileMenu } from "./profile-menu";
 import { ProjectsPanel, type ProjectsPanelHandlers } from "./projects-panel";
 import { SessionPanel } from "./session-panel";
@@ -342,6 +343,23 @@ export function LockedInApp({ initialData }: { initialData: DashboardData }) {
     },
   };
 
+  // Open loops (SPEC 8.8): quick-capture items are their own concern, not
+  // part of the project tree; the apiCall refetch reconciles counts.
+  const createLoop = useCallback(
+    (kind: "loop" | "decision", text: string) => {
+      void apiCall("/api/open-loops", {
+        method: "POST",
+        headers: JSON_HEADERS,
+        body: JSON.stringify({ kind, text }),
+      });
+    },
+    [apiCall],
+  );
+
+  const deleteLoop = useCallback((loopId: string) => {
+    void apiCall(`/api/open-loops/${loopId}`, { method: "DELETE" });
+  }, [apiCall]);
+
   const saveSettings = useCallback(
     async (next: { display_name?: string; completion_style?: CelebrationStyle }) => {
       setSettingsError(null);
@@ -420,6 +438,7 @@ export function LockedInApp({ initialData }: { initialData: DashboardData }) {
         <ProjectsPanel projects={data.projects} handlers={panelHandlers} addLinkError={linksError} />
 
         <div className="flex flex-col gap-4">
+          <OpenLoopsPanel loops={data.openLoops} onCreate={createLoop} onDelete={deleteLoop} />
           <BlockedSitesPanel
             sites={data.blockedSites}
             onAdd={(input) => void addSites({ inputs: [input] })}

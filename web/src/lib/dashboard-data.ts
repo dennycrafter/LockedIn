@@ -49,6 +49,13 @@ export interface ProjectData {
   tasks: TaskData[];
 }
 
+export interface OpenLoopData {
+  id: string;
+  kind: "loop" | "decision";
+  text: string;
+  created_at: string;
+}
+
 export interface BlockedSiteData {
   id: string;
   domain: string;
@@ -74,6 +81,7 @@ export interface DashboardData {
   settings: SettingsData;
   projects: ProjectData[];
   blockedSites: BlockedSiteData[];
+  openLoops: OpenLoopData[];
   todaySessions: SessionData[];
   todayInfractions: InfractionData[];
 }
@@ -95,6 +103,13 @@ interface SnippetRow {
   owner_id: string;
   content: string;
   context: string;
+  created_at: string;
+}
+
+interface OpenLoopRow {
+  id: string;
+  kind: string;
+  text: string;
   created_at: string;
 }
 
@@ -127,7 +142,7 @@ export async function loadDashboardData(): Promise<DashboardData> {
   const client = createServiceClient();
   const dayStart = chicagoTodayStart().toISOString();
 
-  const [settingsRes, projectsRes, tasksRes, linksRes, snippetsRes, sitesRes, sessionsRes, infractionsRes] =
+  const [settingsRes, projectsRes, tasksRes, linksRes, snippetsRes, sitesRes, loopsRes, sessionsRes, infractionsRes] =
     await Promise.all([
       client.from("settings").select("display_name, completion_style").eq("id", 1).limit(1),
       client.from("projects").select("id, name, notes, position").order("position"),
@@ -141,6 +156,8 @@ export async function loadDashboardData(): Promise<DashboardData> {
         .select("id, owner_type, owner_id, content, context, created_at")
         .order("created_at", { ascending: false }),
       client.from("blocked_sites").select("id, domain").order("domain"),
+      // Newest first so the thing just parked sits at the top of its list.
+      client.from("open_loops").select("id, kind, text, created_at").order("created_at", { ascending: false }),
       client
         .from("sessions")
         .select("id, project_id, task_id, active_seconds, started_at, ended_at")
@@ -155,7 +172,7 @@ export async function loadDashboardData(): Promise<DashboardData> {
 
   // A first-run database with no rows must render an empty dashboard, not an
   // error; individual query failures still surface.
-  for (const res of [settingsRes, projectsRes, tasksRes, linksRes, snippetsRes, sitesRes, sessionsRes, infractionsRes]) {
+  for (const res of [settingsRes, projectsRes, tasksRes, linksRes, snippetsRes, sitesRes, loopsRes, sessionsRes, infractionsRes]) {
     if (res.error) throw new Error(res.error.message);
   }
 
@@ -164,6 +181,7 @@ export async function loadDashboardData(): Promise<DashboardData> {
   const linkRows = (linksRes.data ?? []) as LinkRow[];
   const snippetRows = (snippetsRes.data ?? []) as SnippetRow[];
   const siteRows = sitesRes.data ?? [];
+  const loopRows = (loopsRes.data ?? []) as OpenLoopRow[];
   const sessionRows = sessionsRes.data ?? [];
   const infractionRows = infractionsRes.data ?? [];
 
@@ -243,6 +261,12 @@ export async function loadDashboardData(): Promise<DashboardData> {
       tasks: topTasksByProject.get(p.id) ?? [],
     })),
     blockedSites: siteRows.map((s) => ({ id: s.id, domain: s.domain })),
+    openLoops: loopRows.map((l) => ({
+      id: l.id,
+      kind: l.kind as OpenLoopData["kind"],
+      text: l.text,
+      created_at: l.created_at,
+    })),
     todaySessions: sessionRows.map((s) => ({
       id: s.id,
       project_id: s.project_id,
