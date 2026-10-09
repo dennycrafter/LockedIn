@@ -1,0 +1,55 @@
+// Structural check for the built extension. Fails with exit 1 when dist/ is
+// not a loadable Manifest V3 skeleton, so CI and local builds stay honest.
+import { existsSync, readFileSync } from "node:fs";
+
+const manifestPath = "dist/manifest.json";
+const errors = [];
+
+if (!existsSync(manifestPath)) {
+  console.error(`FAIL: ${manifestPath} not found. Run the build first.`);
+  process.exit(1);
+}
+
+const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+
+if (manifest.manifest_version !== 3) {
+  errors.push("manifest_version must be 3");
+}
+if (typeof manifest.name !== "string" || manifest.name.length === 0) {
+  errors.push("manifest.name must be set");
+}
+if (typeof manifest.version !== "string" || !/^\d+\.\d+\.\d+$/.test(manifest.version)) {
+  errors.push("manifest.version must be semver");
+}
+if (manifest.background?.service_worker !== "service-worker.js") {
+  errors.push("background.service_worker must point at service-worker.js");
+}
+if (manifest.action?.default_popup !== "popup.html") {
+  errors.push("action.default_popup must point at popup.html");
+}
+const contentScript = manifest.content_scripts?.[0];
+if (!contentScript || !contentScript.matches?.includes("<all_urls>")) {
+  errors.push("content_scripts[0].matches must include <all_urls>");
+}
+
+const referencedFiles = [
+  manifest.action?.default_popup,
+  manifest.background?.service_worker,
+  ...(contentScript?.js ?? []),
+].filter((f) => typeof f === "string");
+
+for (const file of referencedFiles) {
+  if (!existsSync(`dist/${file}`)) {
+    errors.push(`manifest references ${file} but dist/${file} is missing`);
+  }
+}
+
+if (errors.length > 0) {
+  console.error(`FAIL: extension dist is not a valid MV3 skeleton:\n${errors.map((e) => `  - ${e}`).join("\n")}`);
+  process.exit(1);
+}
+
+console.log(`OK: ${manifest.name} v${manifest.version}, manifest_version 3, all referenced files present:`);
+for (const file of ["manifest.json", ...referencedFiles]) {
+  console.log(`  dist/${file}`);
+}

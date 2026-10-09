@@ -1,0 +1,16 @@
+{
+  "name": "lockedin-extension",
+  "version": "0.1.0",
+  "private": true,
+  "description": "LockedIn Chrome extension: blocks distracting sites during focus sessions and shows a floating timer.",
+  "scripts": {
+    "build": "node esbuild.mjs && node scripts/validate-dist.mjs",
+    "watch": "node esbuild.mjs --watch",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.3.5",
+    "esbuild": "^0.28.2",
+    "typescript": "^5"
+  }
+}
