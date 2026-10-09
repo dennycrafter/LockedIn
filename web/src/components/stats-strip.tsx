@@ -6,15 +6,7 @@ import type { InfractionData, ProjectData, SessionData } from "@/lib/dashboard-d
 import type { ExtensionSession } from "@/lib/extension-session";
 import { formatFocusedMs } from "@/lib/time";
 
-/** Active seconds of a running session right now, excluding paused time. */
-export function liveActiveSeconds(session: ExtensionSession, nowMs: number): number {
-  const reference = session.pausedAtMs ?? nowMs;
-  const elapsedMs = reference - session.startedAtMs;
-  const pausedMs = session.pausedAtMs
-    ? session.pausedTotalMs + (nowMs - session.pausedAtMs)
-    : session.pausedTotalMs;
-  return Math.max(0, Math.floor((elapsedMs - pausedMs) / 1000));
-}
+import { liveActiveSeconds } from "@/lib/live-active-seconds";
 
 export function workTodaySeconds(
   sessions: SessionData[],
