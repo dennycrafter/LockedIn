@@ -14,6 +14,7 @@ import { projectOfTask, projectProgress, withTaskDone } from "@/lib/tree";
 import { runSyncCycle } from "@/lib/sync-cycle";
 import { BlockedSitesPanel } from "./blocked-sites-panel";
 import { CelebrationOverlay } from "./celebration-overlay";
+import { NotesPanel } from "./notes-panel";
 import { ProfileMenu } from "./profile-menu";
 import { ProjectsPanel, type ProjectsPanelHandlers } from "./projects-panel";
 import { SessionPanel } from "./session-panel";
@@ -421,6 +422,7 @@ export function LockedInApp({ initialData }: { initialData: DashboardData }) {
             }}
             error={sitesError}
           />
+          <NotesPanel />
         </div>
       </div>
 
