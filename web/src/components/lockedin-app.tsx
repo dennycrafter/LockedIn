@@ -1,21 +1,28 @@
 "use client";
 
-// Dashboard root (T1): wires the bridge lifecycle to the panels. The extension
-// owns the live session; this component polls getState every second, pings for
-// connection status, and runs the drain/save/ack sync cycle on load and every
-// 30 seconds (SPEC 8.17).
+// Dashboard root (T1 + T2): wires the bridge lifecycle to the panels. The
+// extension owns the live session; this component polls getState every second,
+// pings for connection status, and runs the drain/save/ack sync cycle on load
+// and every 30 seconds (SPEC 8.17). T2 adds the full tree handlers, links,
+// settings, and the completion celebration (SPEC 8.2, 8.3, 8.10).
 import { useCallback, useEffect, useRef, useState } from "react";
 import { callExtension } from "@/lib/bridge-client";
-import type { DashboardData } from "@/lib/dashboard-data";
+import type { CelebrationStyle, DashboardData, SettingsData } from "@/lib/dashboard-data";
 import type { ExtensionSession, LockMode } from "@/lib/extension-session";
+import { shouldCelebrate } from "@/lib/celebration";
+import { projectOfTask, projectProgress, withTaskDone } from "@/lib/tree";
 import { runSyncCycle } from "@/lib/sync-cycle";
 import { BlockedSitesPanel } from "./blocked-sites-panel";
-import { ProjectsPanel } from "./projects-panel";
+import { CelebrationOverlay } from "./celebration-overlay";
+import { ProfileMenu } from "./profile-menu";
+import { ProjectsPanel, type ProjectsPanelHandlers } from "./projects-panel";
 import { SessionPanel } from "./session-panel";
 import { StartSessionDialog } from "./start-session-dialog";
 import { StatsStrip } from "./stats-strip";
 
 type ConnectionState = "checking" | "connected" | "disconnected";
+
+const JSON_HEADERS = { "Content-Type": "application/json" };
 
 function connectionDot(state: ConnectionState): { background: string; text: string } {
   if (state === "connected") return { background: "var(--ok)", text: "Extension connected" };
@@ -31,6 +38,9 @@ export function LockedInApp({ initialData }: { initialData: DashboardData }) {
   const [startOpen, setStartOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [sitesError, setSitesError] = useState<string | null>(null);
+  const [settingsError, setSettingsError] = useState<string | null>(null);
+  const [linksError, setLinksError] = useState<string | null>(null);
+  const [celebration, setCelebration] = useState<{ name: string; style: CelebrationStyle } | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const showToast = useCallback((message: string) => {
@@ -188,7 +198,7 @@ export function LockedInApp({ initialData }: { initialData: DashboardData }) {
       try {
         const response = await fetch("/api/blocked-sites", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: JSON_HEADERS,
           body: JSON.stringify(body),
         });
         const payload = (await response.json().catch(() => ({}))) as {
@@ -210,13 +220,153 @@ export function LockedInApp({ initialData }: { initialData: DashboardData }) {
     [pushBlockedSites],
   );
 
+  // T2 handlers (SPEC 8.2, 8.3): every mutation posts to its API route and the
+  // refetch in apiCall reconciles positions and progress from the database.
+  const panelHandlers: ProjectsPanelHandlers = {
+    onCreateProject: (name) => {
+      void apiCall("/api/projects", { method: "POST", headers: JSON_HEADERS, body: JSON.stringify({ name }) });
+    },
+    onRenameProject: (projectId, name) => {
+      void apiCall(`/api/projects/${projectId}`, {
+        method: "PATCH",
+        headers: JSON_HEADERS,
+        body: JSON.stringify({ name }),
+      });
+    },
+    onUpdateProjectNotes: (projectId, notes) => {
+      void apiCall(`/api/projects/${projectId}`, {
+        method: "PATCH",
+        headers: JSON_HEADERS,
+        body: JSON.stringify({ notes }),
+      });
+    },
+    onDeleteProject: (projectId) => {
+      void apiCall(`/api/projects/${projectId}`, { method: "DELETE" });
+    },
+    // Reorder refetches even on failure so a rejected drag does not leave the
+    // panel showing an order the database refused.
+    onReorder: async (kind, orderedIds) => {
+      try {
+        const response = await fetch("/api/reorder", {
+          method: "POST",
+          headers: JSON_HEADERS,
+          body: JSON.stringify({ kind, ids: orderedIds }),
+        });
+        if (!response.ok) {
+          const body = (await response.json().catch(() => ({}))) as { error?: string };
+          showToast(body.error ?? `Request failed (${response.status})`);
+        }
+        await refetchData();
+      } catch {
+        showToast("Network request failed.");
+        await refetchData();
+      }
+    },
+    onCreateTask: (projectId, parentId, title) => {
+      void apiCall("/api/tasks", {
+        method: "POST",
+        headers: JSON_HEADERS,
+        body: JSON.stringify({ projectId, parentId, title }),
+      });
+    },
+    onRenameTask: (taskId, title) => {
+      void apiCall(`/api/tasks/${taskId}`, {
+        method: "PATCH",
+        headers: JSON_HEADERS,
+        body: JSON.stringify({ title }),
+      });
+    },
+    onToggleTask: async (taskId, done) => {
+      const projectsBefore = data.projects;
+      const ownerBefore = projectOfTask(projectsBefore, taskId);
+      const progressBefore = ownerBefore ? projectProgress(ownerBefore) : null;
+      const ok = await apiCall(`/api/tasks/${taskId}`, {
+        method: "PATCH",
+        headers: JSON_HEADERS,
+        body: JSON.stringify({ done }),
+      });
+      if (!ok || !done || !ownerBefore || !progressBefore) return;
+      // Celebrate when this tick completed the project (SPEC 8.10), judged on
+      // the local projection so a race with refetch cannot double-fire it.
+      const ownerAfter = projectOfTask(withTaskDone(projectsBefore, taskId, done), taskId);
+      if (ownerAfter && shouldCelebrate(progressBefore, projectProgress(ownerAfter))) {
+        setCelebration({ name: data.settings.display_name, style: data.settings.completion_style });
+      }
+    },
+    onDeleteTask: (taskId) => {
+      void apiCall(`/api/tasks/${taskId}`, { method: "DELETE" });
+    },
+    onUpdateTaskNotes: (taskId, notes) => {
+      void apiCall(`/api/tasks/${taskId}`, {
+        method: "PATCH",
+        headers: JSON_HEADERS,
+        body: JSON.stringify({ notes }),
+      });
+    },
+    onStartTask: startOnTask,
+    // Returns true on success so the links modal closes (design rule: add
+    // actions close on success with a toast, stay open on error).
+    onAddLink: async (ownerType, ownerId, name, url) => {
+      setLinksError(null);
+      try {
+        const response = await fetch("/api/links", {
+          method: "POST",
+          headers: JSON_HEADERS,
+          body: JSON.stringify({ ownerType, ownerId, name, url }),
+        });
+        const payload = (await response.json().catch(() => ({}))) as { error?: string };
+        if (!response.ok) {
+          setLinksError(payload.error ?? `Request failed (${response.status})`);
+          return false;
+        }
+        showToast("Link added");
+        await refetchData();
+        return true;
+      } catch {
+        setLinksError("Network request failed.");
+        return false;
+      }
+    },
+    onDeleteLink: (linkId) => {
+      void apiCall(`/api/links/${linkId}`, { method: "DELETE" });
+    },
+  };
+
+  const saveSettings = useCallback(
+    async (next: { display_name?: string; completion_style?: CelebrationStyle }) => {
+      setSettingsError(null);
+      try {
+        const response = await fetch("/api/settings", {
+          method: "PATCH",
+          headers: JSON_HEADERS,
+          body: JSON.stringify(next),
+        });
+        const payload = (await response.json().catch(() => ({}))) as { settings?: SettingsData; error?: string };
+        if (!response.ok) {
+          setSettingsError(payload.error ?? `Request failed (${response.status})`);
+          return;
+        }
+        if (payload.settings) {
+          const saved = payload.settings;
+          setData((prev) => ({ ...prev, settings: saved }));
+          showToast("Settings saved");
+        }
+      } catch {
+        setSettingsError("Network request failed.");
+      }
+    },
+    [showToast],
+  );
+
   const dot = connectionDot(connection);
 
   return (
     <main className="mx-auto flex min-h-screen max-w-[1760px] flex-col gap-6 px-[clamp(16px,2.6vw,40px)] py-6">
       <header className="sticky top-0 z-10 -mx-[clamp(16px,2.6vw,40px)] flex flex-wrap items-center gap-3 border-b border-[var(--line)] bg-[color-mix(in_srgb,var(--bg)_82%,transparent)] px-[clamp(16px,2.6vw,40px)] py-3 backdrop-blur">
         <span className="text-lg font-semibold text-[var(--fg)]">LockedIn</span>
-        <span className="hidden text-sm text-[var(--muted)] sm:inline">Welcome back</span>
+        <span className="hidden text-sm text-[var(--muted)] sm:inline">
+          Welcome back, {data.settings.display_name}
+        </span>
         <span
           className="ml-auto flex items-center gap-2 rounded-full border border-[var(--line)] px-3 py-1 text-xs"
           style={{ color: dot.background }}
@@ -224,15 +374,7 @@ export function LockedInApp({ initialData }: { initialData: DashboardData }) {
           <span aria-hidden className="inline-block h-2 w-2 rounded-full" style={{ background: dot.background }} />
           {dot.text}
         </span>
-        <form action="/api/logout" method="post">
-          <button
-            type="submit"
-            aria-label="Lock the dashboard and clear the session"
-            className="rounded-md border border-[var(--line)] px-3 py-1.5 text-sm text-[var(--muted)] hover:border-[var(--muted)] hover:text-[var(--fg)]"
-          >
-            Lock
-          </button>
-        </form>
+        <ProfileMenu settings={data.settings} error={settingsError} onSave={saveSettings} />
       </header>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,7fr)_minmax(0,12fr)_minmax(0,5fr)]">
@@ -265,33 +407,7 @@ export function LockedInApp({ initialData }: { initialData: DashboardData }) {
           )}
         </div>
 
-        <ProjectsPanel
-          projects={data.projects}
-          onCreateProject={(name) =>
-            void apiCall("/api/projects", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ name }),
-            })
-          }
-          onCreateTask={(projectId, title) =>
-            void apiCall("/api/tasks", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ projectId, title }),
-            })
-          }
-          onToggleTask={(taskId, done) =>
-            void apiCall(`/api/tasks/${taskId}`, {
-              method: "PATCH",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ done }),
-            })
-          }
-          onDeleteProject={(projectId) => void apiCall(`/api/projects/${projectId}`, { method: "DELETE" })}
-          onDeleteTask={(taskId) => void apiCall(`/api/tasks/${taskId}`, { method: "DELETE" })}
-          onStartTask={startOnTask}
-        />
+        <ProjectsPanel projects={data.projects} handlers={panelHandlers} addLinkError={linksError} />
 
         <div className="flex flex-col gap-4">
           <BlockedSitesPanel
@@ -314,6 +430,10 @@ export function LockedInApp({ initialData }: { initialData: DashboardData }) {
           onClose={() => setStartOpen(false)}
           onStart={(spec) => void startSession(spec)}
         />
+      )}
+
+      {celebration && (
+        <CelebrationOverlay name={celebration.name} style={celebration.style} onClose={() => setCelebration(null)} />
       )}
 
       {toast && (
