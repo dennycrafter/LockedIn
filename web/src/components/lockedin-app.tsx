@@ -15,6 +15,7 @@ import { runSyncCycle } from "@/lib/sync-cycle";
 import { toExtensionTree } from "@/lib/extension-tree";
 import { BlockedSitesPanel } from "./blocked-sites-panel";
 import { CelebrationOverlay } from "./celebration-overlay";
+import { MiscTasksPanel } from "./misc-tasks-panel";
 import { NotesPanel } from "./notes-panel";
 import { OpenLoopsPanel } from "./open-loops-panel";
 import { ProfileMenu } from "./profile-menu";
@@ -39,6 +40,9 @@ export function LockedInApp({ initialData }: { initialData: DashboardData }) {
   const [connection, setConnection] = useState<ConnectionState>("checking");
   const [nowMs, setNowMs] = useState<number>(() => Date.now());
   const [startOpen, setStartOpen] = useState(false);
+  // Misc task row timers open the same dialog with the misc task pre-targeted
+  // (SPEC 8.9); null means the dialog was opened from "Start working".
+  const [startMiscTask, setStartMiscTask] = useState<{ id: string; title: string } | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [sitesError, setSitesError] = useState<string | null>(null);
   const [settingsError, setSettingsError] = useState<string | null>(null);
@@ -152,17 +156,25 @@ export function LockedInApp({ initialData }: { initialData: DashboardData }) {
   );
 
   const startSession = useCallback(
-    async (spec: { projectId: string | null; taskId: string | null; minutes: number; lockMode: LockMode }) => {
+    async (spec: {
+      projectId: string | null;
+      taskId: string | null;
+      miscTaskId: string | null;
+      minutes: number;
+      lockMode: LockMode;
+    }) => {
       setStartOpen(false);
       // Make sure the extension has the newest block list before locking.
       pushBlockedSites(data.blockedSites.map((site) => site.domain));
       const task = spec.taskId ? data.projects.flatMap((p) => p.tasks).find((t) => t.id === spec.taskId) : null;
       const project = spec.projectId ? data.projects.find((p) => p.id === spec.projectId) : null;
-      const label = task?.title ?? project?.name ?? "Focus session";
+      const miscTask = spec.miscTaskId ? data.miscTasks.find((t) => t.id === spec.miscTaskId) : null;
+      const label = miscTask?.title ?? task?.title ?? project?.name ?? "Focus session";
       const reply = await callExtension("startSession", {
         id: crypto.randomUUID(),
         projectId: spec.projectId,
         taskId: spec.taskId,
+        miscTaskId: spec.miscTaskId,
         label,
         lockMode: spec.lockMode,
         plannedSeconds: spec.minutes * 60,
@@ -173,7 +185,7 @@ export function LockedInApp({ initialData }: { initialData: DashboardData }) {
         showToast(reply.error);
       }
     },
-    [data.blockedSites, data.projects, pushBlockedSites, showToast],
+    [data.blockedSites, data.miscTasks, data.projects, pushBlockedSites, showToast],
   );
 
   // Row timer buttons open the same start dialog; pre-selecting the task lands
@@ -356,9 +368,51 @@ export function LockedInApp({ initialData }: { initialData: DashboardData }) {
     [apiCall],
   );
 
-  const deleteLoop = useCallback((loopId: string) => {
-    void apiCall(`/api/open-loops/${loopId}`, { method: "DELETE" });
-  }, [apiCall]);
+  const deleteLoop = useCallback(
+    (loopId: string) => {
+      void apiCall(`/api/open-loops/${loopId}`, { method: "DELETE" });
+    },
+    [apiCall],
+  );
+
+  // Misc tasks (SPEC 8.9): one-line items; no notes, no links, never in wind
+  // down. Same shape as the other panel handlers: post, then the apiCall
+  // refetch reconciles from the database.
+  const createMiscTask = useCallback(
+    (title: string) => {
+      void apiCall("/api/misc-tasks", { method: "POST", headers: JSON_HEADERS, body: JSON.stringify({ title }) });
+    },
+    [apiCall],
+  );
+
+  const toggleMiscTask = useCallback(
+    (id: string, done: boolean) => {
+      void apiCall(`/api/misc-tasks/${id}`, {
+        method: "PATCH",
+        headers: JSON_HEADERS,
+        body: JSON.stringify({ done }),
+      });
+    },
+    [apiCall],
+  );
+
+  const deleteMiscTask = useCallback(
+    (id: string) => {
+      void apiCall(`/api/misc-tasks/${id}`, { method: "DELETE" });
+    },
+    [apiCall],
+  );
+
+  const reorderMiscTasks = useCallback(
+    (orderedIds: string[]) => {
+      void apiCall("/api/reorder", {
+        method: "POST",
+        headers: JSON_HEADERS,
+        body: JSON.stringify({ kind: "misc_tasks", orderedIds }),
+      });
+    },
+    [apiCall],
+  );
 
   const saveSettings = useCallback(
     async (next: { display_name?: string; completion_style?: CelebrationStyle }) => {
@@ -419,7 +473,10 @@ export function LockedInApp({ initialData }: { initialData: DashboardData }) {
           ) : (
             <button
               type="button"
-              onClick={() => setStartOpen(true)}
+              onClick={() => {
+                setStartMiscTask(null);
+                setStartOpen(true);
+              }}
               disabled={connection === "disconnected"}
               className="rounded-md px-4 py-3 text-sm font-medium text-white disabled:opacity-50"
               style={{ background: "var(--accent)" }}
@@ -438,6 +495,21 @@ export function LockedInApp({ initialData }: { initialData: DashboardData }) {
         <ProjectsPanel projects={data.projects} handlers={panelHandlers} addLinkError={linksError} />
 
         <div className="flex flex-col gap-4">
+          <MiscTasksPanel
+            miscTasks={data.miscTasks}
+            startDisabled={session !== null}
+            onCreate={createMiscTask}
+            onToggle={toggleMiscTask}
+            onDelete={deleteMiscTask}
+            onReorder={reorderMiscTasks}
+            onStart={(id) => {
+              const task = data.miscTasks.find((t) => t.id === id);
+              if (task) {
+                setStartMiscTask({ id: task.id, title: task.title });
+                setStartOpen(true);
+              }
+            }}
+          />
           <OpenLoopsPanel loops={data.openLoops} onCreate={createLoop} onDelete={deleteLoop} />
           <BlockedSitesPanel
             sites={data.blockedSites}
@@ -463,6 +535,7 @@ export function LockedInApp({ initialData }: { initialData: DashboardData }) {
       {startOpen && (
         <StartSessionDialog
           projects={data.projects}
+          miscTask={startMiscTask}
           onClose={() => setStartOpen(false)}
           onStart={(spec) => void startSession(spec)}
         />
