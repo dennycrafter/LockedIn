@@ -18,6 +18,7 @@ import { CelebrationOverlay } from "./celebration-overlay";
 import { MiscTasksPanel } from "./misc-tasks-panel";
 import { NotesPanel } from "./notes-panel";
 import { OpenLoopsPanel } from "./open-loops-panel";
+import { OrganizeModal } from "./organize-modal";
 import { ProfileMenu } from "./profile-menu";
 import { ProjectsPanel, type ProjectsPanelHandlers } from "./projects-panel";
 import { SessionPanel } from "./session-panel";
@@ -579,6 +580,18 @@ export function LockedInApp({ initialData }: { initialData: DashboardData }) {
             onAttached={() => {
               showToast("Snippet attached");
               void refetchData();
+            }}
+          />
+          <OrganizeModal
+            projects={data.projects}
+            miscTasks={data.miscTasks}
+            onToast={showToast}
+            onChanged={() => void refetchData()}
+            onStartItem={(item) => {
+              // Existing dialog only pre-targets misc items; task targeting
+              // lands with T3's row timer work (SPEC 8.4).
+              if (item.kind === "misc") setStartMiscTask({ id: item.id, title: item.title });
+              setStartOpen(true);
             }}
           />
         </div>
