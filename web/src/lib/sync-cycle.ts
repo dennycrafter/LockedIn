@@ -64,16 +64,33 @@ export async function runSyncCycle(): Promise<SyncCycleResult> {
     return { ok: true, savedSessions: 0, savedInfractions: 0, savedSnippets: 0, savedTimeStudies: 0 };
   }
 
-  const response = await fetch("/api/sync", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      sessions: sessions.map(toSessionRow),
-      infractions: infractions.map(toInfractionRow),
-      snippets: snippets.map(toSnippetRow),
-      time_studies: timeStudies.map(toTimeStudyRow),
-    }),
-  });
+  // Callers run this cycle with `void runSyncCycle()`, so a fetch rejection
+  // here (offline blip, aborted request) would escape as an unhandled promise
+  // rejection. Catch it and report through the normal { ok: false } shape;
+  // the queue stays intact and the next cycle retries.
+  let response: Response;
+  try {
+    response = await fetch("/api/sync", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        sessions: sessions.map(toSessionRow),
+        infractions: infractions.map(toInfractionRow),
+        snippets: snippets.map(toSnippetRow),
+        time_studies: timeStudies.map(toTimeStudyRow),
+      }),
+    });
+  } catch (cause) {
+    const message = cause instanceof Error ? cause.message : String(cause);
+    return {
+      ok: false,
+      savedSessions: 0,
+      savedInfractions: 0,
+      savedSnippets: 0,
+      savedTimeStudies: 0,
+      error: `Saving the queue failed. ${message}`.slice(0, 300),
+    };
+  }
   if (!response.ok) {
     const text = await response.text().catch(() => "");
     return {
