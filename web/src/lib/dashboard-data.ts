@@ -11,6 +11,8 @@ export type CelebrationStyle = "dramatic" | "hype" | "calm";
 export interface SettingsData {
   display_name: string;
   completion_style: CelebrationStyle;
+  /** Time study check-in interval in minutes; null = off (SPEC 8.11). */
+  time_study_minutes: number | null;
 }
 
 export interface LinkData {
@@ -63,6 +65,12 @@ export interface OpenLoopData {
   created_at: string;
 }
 
+export interface TimeStudyEntryData {
+  id: string;
+  text: string;
+  occurred_at: string;
+}
+
 export interface BlockedSiteData {
   id: string;
   domain: string;
@@ -91,11 +99,16 @@ export interface DashboardData {
   openLoops: OpenLoopData[];
   miscTasks: MiscTaskData[];
   todaySessions: SessionData[];
+  todayTimeStudies: TimeStudyEntryData[];
   todayInfractions: InfractionData[];
 }
 
 /** Defaults for a database where the settings row has not been inserted yet. */
-export const DEFAULT_SETTINGS: SettingsData = { display_name: "Boss", completion_style: "dramatic" };
+export const DEFAULT_SETTINGS: SettingsData = {
+  display_name: "Boss",
+  completion_style: "dramatic",
+  time_study_minutes: null,
+};
 
 interface LinkRow {
   id: string;
@@ -157,9 +170,9 @@ export async function loadDashboardData(): Promise<DashboardData> {
   const client = createServiceClient();
   const dayStart = chicagoTodayStart().toISOString();
 
-  const [settingsRes, projectsRes, tasksRes, linksRes, snippetsRes, sitesRes, loopsRes, miscRes, sessionsRes, infractionsRes] =
+  const [settingsRes, projectsRes, tasksRes, linksRes, snippetsRes, sitesRes, loopsRes, miscRes, sessionsRes, infractionsRes, timeStudiesRes] =
     await Promise.all([
-      client.from("settings").select("display_name, completion_style").eq("id", 1).limit(1),
+      client.from("settings").select("display_name, completion_style, time_study_minutes").eq("id", 1).limit(1),
       client.from("projects").select("id, name, notes, position").order("position"),
       client
         .from("tasks")
@@ -184,11 +197,12 @@ export async function loadDashboardData(): Promise<DashboardData> {
         .select("id, kind, detail, occurred_at")
         .gte("occurred_at", dayStart)
         .order("occurred_at"),
+      client.from("time_studies").select("id, text, occurred_at").gte("occurred_at", dayStart).order("occurred_at"),
     ]);
 
   // A first-run database with no rows must render an empty dashboard, not an
   // error; individual query failures still surface.
-  for (const res of [settingsRes, projectsRes, tasksRes, linksRes, snippetsRes, sitesRes, loopsRes, miscRes, sessionsRes, infractionsRes]) {
+  for (const res of [settingsRes, projectsRes, tasksRes, linksRes, snippetsRes, sitesRes, loopsRes, miscRes, sessionsRes, infractionsRes, timeStudiesRes]) {
     if (res.error) throw new Error(res.error.message);
   }
 
@@ -201,12 +215,14 @@ export async function loadDashboardData(): Promise<DashboardData> {
   const miscRows = (miscRes.data ?? []) as MiscTaskRow[];
   const sessionRows = sessionsRes.data ?? [];
   const infractionRows = infractionsRes.data ?? [];
+  const timeStudyRows = timeStudiesRes.data ?? [];
 
   const settingsRow = settingsRes.data?.[0];
   const settings: SettingsData = settingsRow
     ? {
         display_name: settingsRow.display_name,
         completion_style: settingsRow.completion_style as CelebrationStyle,
+        time_study_minutes: settingsRow.time_study_minutes ?? null,
       }
     : DEFAULT_SETTINGS;
 
@@ -303,6 +319,11 @@ export async function loadDashboardData(): Promise<DashboardData> {
       kind: f.kind as InfractionData["kind"],
       detail: f.detail,
       occurred_at: f.occurred_at,
+    })),
+    todayTimeStudies: timeStudyRows.map((t) => ({
+      id: t.id,
+      text: t.text,
+      occurred_at: t.occurred_at,
     })),
   };
 }

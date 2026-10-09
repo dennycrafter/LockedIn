@@ -1,15 +1,16 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { isAuthed } from "@/lib/require-user";
 import { createServiceClient } from "@/lib/supabase";
+import { isTimeStudyChoice } from "@/lib/time-study";
 
 export const dynamic = "force-dynamic";
 
 const STYLES = ["dramatic", "hype", "calm"] as const;
 
 // Settings row (single row, id=1): display name for the greeting and the
-// celebration message, and the completion message style (SPEC 8.10). Other
-// settings fields land with their own tickets (default minutes T3, helper
-// mode T8, time study T5).
+// celebration message, completion message style (SPEC 8.10), and the time
+// study check-in interval (SPEC 8.11). Other settings fields land with their
+// own tickets (default minutes T3, helper mode T8).
 export async function PATCH(request: NextRequest) {
   if (!(await isAuthed())) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -20,9 +21,13 @@ export async function PATCH(request: NextRequest) {
   } catch {
     return NextResponse.json({ error: "Body must be JSON." }, { status: 400 });
   }
-  const raw = body as { display_name?: unknown; completion_style?: unknown };
+  const raw = body as { display_name?: unknown; completion_style?: unknown; time_study_minutes?: unknown };
 
-  const update: { display_name?: string; completion_style?: (typeof STYLES)[number] } = {};
+  const update: {
+    display_name?: string;
+    completion_style?: (typeof STYLES)[number];
+    time_study_minutes?: number | null;
+  } = {};
   if (raw.display_name !== undefined) {
     if (typeof raw.display_name !== "string" || raw.display_name.trim() === "") {
       return NextResponse.json({ error: "Display name is required." }, { status: 400 });
@@ -35,6 +40,16 @@ export async function PATCH(request: NextRequest) {
     }
     update.completion_style = raw.completion_style as (typeof STYLES)[number];
   }
+  if (raw.time_study_minutes !== undefined) {
+    // null = off; otherwise one of the SPEC 8.11 intervals.
+    if (raw.time_study_minutes === null) {
+      update.time_study_minutes = null;
+    } else if (isTimeStudyChoice(raw.time_study_minutes)) {
+      update.time_study_minutes = raw.time_study_minutes;
+    } else {
+      return NextResponse.json({ error: "Time study must be off or 5, 15, 30, 45 or 60 minutes." }, { status: 400 });
+    }
+  }
   if (Object.keys(update).length === 0) {
     return NextResponse.json({ error: "Nothing to update." }, { status: 400 });
   }
@@ -44,7 +59,7 @@ export async function PATCH(request: NextRequest) {
     .from("settings")
     .update(update)
     .eq("id", 1)
-    .select("display_name, completion_style");
+    .select("display_name, completion_style, time_study_minutes");
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }

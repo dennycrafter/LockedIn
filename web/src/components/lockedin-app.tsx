@@ -23,6 +23,8 @@ import { ProjectsPanel, type ProjectsPanelHandlers } from "./projects-panel";
 import { SessionPanel } from "./session-panel";
 import { StartSessionDialog } from "./start-session-dialog";
 import { StatsStrip } from "./stats-strip";
+import { TimeStudyPanel } from "./time-study-panel";
+import { TimeStudyPromptCard } from "./time-study-prompt";
 
 type ConnectionState = "checking" | "connected" | "disconnected";
 
@@ -48,6 +50,10 @@ export function LockedInApp({ initialData }: { initialData: DashboardData }) {
   const [settingsError, setSettingsError] = useState<string | null>(null);
   const [linksError, setLinksError] = useState<string | null>(null);
   const [celebration, setCelebration] = useState<{ name: string; style: CelebrationStyle } | null>(null);
+  // Pending time study check-in surfaced by getState (SPEC 8.11); null = none.
+  const [timeStudyPrompt, setTimeStudyPrompt] = useState<{ id: string } | null>(null);
+  const [timeStudySaving, setTimeStudySaving] = useState(false);
+  const [timeStudyError, setTimeStudyError] = useState<string | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const showToast = useCallback((message: string) => {
@@ -99,8 +105,9 @@ export function LockedInApp({ initialData }: { initialData: DashboardData }) {
       if (document.visibilityState !== "visible") return;
       const reply = await callExtension("getState");
       if (reply.ok) {
-        const state = (reply.data ?? {}) as { session?: ExtensionSession | null };
+        const state = (reply.data ?? {}) as { session?: ExtensionSession | null; timeStudyPrompt?: { id: string } | null };
         setSession(state.session ?? null);
+        setTimeStudyPrompt(state.timeStudyPrompt ?? null);
       }
       setNowMs(Date.now());
     };
@@ -116,7 +123,7 @@ export function LockedInApp({ initialData }: { initialData: DashboardData }) {
       const result = await runSyncCycle();
       if (!alive) return;
       if (!result.ok && result.error) showToast(result.error);
-      if (result.savedSessions > 0 || result.savedInfractions > 0) {
+      if (result.savedSessions > 0 || result.savedInfractions > 0 || result.savedTimeStudies > 0) {
         await refetchData();
         if (result.savedSessions > 0) showToast("Session saved");
       }
@@ -415,7 +422,7 @@ export function LockedInApp({ initialData }: { initialData: DashboardData }) {
   );
 
   const saveSettings = useCallback(
-    async (next: { display_name?: string; completion_style?: CelebrationStyle }) => {
+    async (next: { display_name?: string; completion_style?: CelebrationStyle; time_study_minutes?: number | null }) => {
       setSettingsError(null);
       try {
         const response = await fetch("/api/settings", {
@@ -426,18 +433,58 @@ export function LockedInApp({ initialData }: { initialData: DashboardData }) {
         const payload = (await response.json().catch(() => ({}))) as { settings?: SettingsData; error?: string };
         if (!response.ok) {
           setSettingsError(payload.error ?? `Request failed (${response.status})`);
-          return;
+          return false;
         }
         if (payload.settings) {
           const saved = payload.settings;
           setData((prev) => ({ ...prev, settings: saved }));
           showToast("Settings saved");
         }
+        return true;
       } catch {
         setSettingsError("Network request failed.");
+        return false;
       }
     },
     [showToast],
+  );
+
+  // Time study interval (SPEC 8.11): persist the setting, then tell the
+  // extension so its chrome.alarms schedule follows immediately.
+  const changeTimeStudyInterval = useCallback(
+    async (minutes: number | null) => {
+      const saved = await saveSettings({ time_study_minutes: minutes });
+      if (saved) {
+        const reply = await callExtension("setTimeStudy", { minutes });
+        if (!reply.ok) showToast(reply.error);
+      }
+    },
+    [saveSettings, showToast],
+  );
+
+  // A check-in answer queues in the extension; flush right away so today's
+  // list updates without waiting for the 30s sync cycle.
+  const answerTimeStudy = useCallback(
+    async (text: string) => {
+      setTimeStudySaving(true);
+      setTimeStudyError(null);
+      const reply = await callExtension("answerTimeStudy", { text });
+      if (!reply.ok) {
+        setTimeStudySaving(false);
+        setTimeStudyError(reply.error);
+        return;
+      }
+      setTimeStudyPrompt(null);
+      setTimeStudySaving(false);
+      const result = await runSyncCycle();
+      if (!result.ok && result.error) {
+        showToast(result.error);
+        return;
+      }
+      await refetchData();
+      showToast("Check-in saved");
+    },
+    [refetchData, showToast],
   );
 
   const dot = connectionDot(connection);
@@ -511,6 +558,11 @@ export function LockedInApp({ initialData }: { initialData: DashboardData }) {
             }}
           />
           <OpenLoopsPanel loops={data.openLoops} onCreate={createLoop} onDelete={deleteLoop} />
+          <TimeStudyPanel
+            entries={data.todayTimeStudies}
+            intervalMinutes={data.settings.time_study_minutes}
+            onChangeInterval={(minutes) => void changeTimeStudyInterval(minutes)}
+          />
           <BlockedSitesPanel
             sites={data.blockedSites}
             onAdd={(input) => void addSites({ inputs: [input] })}
@@ -543,6 +595,15 @@ export function LockedInApp({ initialData }: { initialData: DashboardData }) {
 
       {celebration && (
         <CelebrationOverlay name={celebration.name} style={celebration.style} onClose={() => setCelebration(null)} />
+      )}
+
+      {timeStudyPrompt && (
+        <TimeStudyPromptCard
+          prompt={timeStudyPrompt}
+          onSave={(text) => void answerTimeStudy(text)}
+          saving={timeStudySaving}
+          error={timeStudyError}
+        />
       )}
 
       {toast && (

@@ -1,5 +1,4 @@
 import type { QueueState } from "./queue";
-import { emptyQueue } from "./queue";
 import type { ActiveSession } from "./session";
 import type { TreeState } from "./tree";
 
@@ -11,6 +10,8 @@ const KEY_BLOCKED_SITES = "blockedSites";
 const KEY_DASHBOARD_ORIGIN = "dashboardOrigin";
 const KEY_QUEUE = "queue";
 const KEY_TREE = "tree";
+const KEY_TIME_STUDY_MINUTES = "timeStudyMinutes";
+const KEY_TIME_STUDY_PROMPT = "timeStudyPrompt";
 
 async function getValue<T>(key: string): Promise<T | undefined> {
   const bag = await chrome.storage.local.get(key);
@@ -47,9 +48,14 @@ export async function setDashboardOrigin(origin: string): Promise<void> {
 
 export async function getQueue(): Promise<QueueState> {
   const stored = await getValue<Partial<QueueState>>(KEY_QUEUE);
-  // Queues stored before snippets existed lack the field; normalize so every
-  // reader sees a full QueueState.
-  return { ...emptyQueue(), ...stored, snippets: stored?.snippets ?? [] };
+  // Queues stored before snippets or time studies existed lack those fields;
+  // normalize so every reader sees a full QueueState.
+  return {
+    sessions: stored?.sessions ?? [],
+    infractions: stored?.infractions ?? [],
+    snippets: stored?.snippets ?? [],
+    timeStudies: stored?.timeStudies ?? [],
+  };
 }
 
 export async function setQueue(queue: QueueState): Promise<void> {
@@ -64,4 +70,28 @@ export async function getTree(): Promise<TreeState | null> {
 
 export async function setTree(tree: TreeState): Promise<void> {
   await setValue(KEY_TREE, tree);
+}
+
+// --- time study (SPEC 8.11) ------------------------------------------------
+
+export interface TimeStudyPrompt {
+  id: string;
+  at: number; // epoch ms, when the alarm fired
+}
+
+export async function getTimeStudyMinutes(): Promise<number | null> {
+  const value = await getValue<number | null>(KEY_TIME_STUDY_MINUTES);
+  return value ?? null;
+}
+
+export async function setTimeStudyMinutes(minutes: number | null): Promise<void> {
+  await setValue(KEY_TIME_STUDY_MINUTES, minutes);
+}
+
+export async function getTimeStudyPrompt(): Promise<TimeStudyPrompt | null> {
+  return (await getValue<TimeStudyPrompt>(KEY_TIME_STUDY_PROMPT)) ?? null;
+}
+
+export async function setTimeStudyPrompt(prompt: TimeStudyPrompt | null): Promise<void> {
+  await setValue(KEY_TIME_STUDY_PROMPT, prompt);
 }

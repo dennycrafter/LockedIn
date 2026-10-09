@@ -65,6 +65,8 @@ describe("parseSyncPayload", () => {
   it("accepts a valid batch and maps to snake_case rows", () => {
     const parsed = parseSyncPayload(validBody());
     expect(parsed).not.toBeNull();
+    // time_studies is optional in the payload; absence parses to an empty list.
+    expect(parsed?.time_studies).toEqual([]);
     expect(parsed?.sessions).toHaveLength(1);
     expect(parsed?.sessions[0]).toMatchObject({
       id: SESSION_ID,
@@ -90,6 +92,7 @@ describe("parseSyncPayload", () => {
       sessions: [],
       infractions: [],
       snippets: [],
+      time_studies: [],
     });
   });
 
@@ -99,6 +102,26 @@ describe("parseSyncPayload", () => {
     const parsed = parseSyncPayload(body);
     expect(parsed).not.toBeNull();
     expect(parsed?.snippets).toEqual([]);
+    // Time studies ride along the same optional contract (T5).
+    expect(parsed?.time_studies).toEqual([]);
+  });
+
+  it("accepts time study rows and defaults them to empty when absent", () => {
+    const withStudies = parseSyncPayload({
+      sessions: [],
+      infractions: [],
+      time_studies: [
+        {
+          id: "0b9e6c1e-0000-4000-8000-000000000003",
+          text: "Writing the report",
+          occurred_at: "2026-10-09T15:00:00.000Z",
+        },
+      ],
+    });
+    expect(withStudies).not.toBeNull();
+    expect(withStudies?.time_studies).toHaveLength(1);
+    expect(withStudies?.time_studies[0]).toMatchObject({ text: "Writing the report" });
+    expect(parseSyncPayload({ sessions: [], infractions: [] })?.time_studies).toEqual([]);
   });
 
   it("rejects malformed snippet fields", () => {
@@ -133,6 +156,18 @@ describe("parseSyncPayload", () => {
       mutate(body);
       expect(parseSyncPayload(body)).toBeNull();
     }
+  });
+
+  it("rejects a malformed time study row instead of dropping it", () => {
+    const body = validBody();
+    body.time_studies = [{ id: "not-a-uuid", text: "x", occurred_at: "2026-10-09T15:00:00.000Z" }];
+    expect(parseSyncPayload(body)).toBeNull();
+    const body2 = validBody();
+    body2.time_studies = [{ id: "0b9e6c1e-0000-4000-8000-000000000004", text: "", occurred_at: "2026-10-09T15:00:00.000Z" }];
+    expect(parseSyncPayload(body2)).toBeNull();
+    const body3 = validBody();
+    body3.time_studies = [{ id: "0b9e6c1e-0000-4000-8000-000000000005", text: "x", occurred_at: "nope" }];
+    expect(parseSyncPayload(body3)).toBeNull();
   });
 
   it("rejects non-uuid ids and malformed fields", () => {

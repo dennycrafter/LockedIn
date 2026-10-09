@@ -13,7 +13,9 @@ export type BridgeMethod =
   | "startSession"
   | "getState"
   | "drainQueue"
-  | "ackQueue";
+  | "ackQueue"
+  | "setTimeStudy"
+  | "answerTimeStudy";
 
 export interface StartSessionPayload {
   id: string;
@@ -28,12 +30,17 @@ export interface StartSessionPayload {
 export interface StatePayload {
   session: import("./session").ActiveSession | null;
   softUnlockAt: number | null;
+  /** Check-in interval, null = off (SPEC 8.11). */
+  timeStudyMinutes: number | null;
+  /** Unanswered check-in; the dashboard shows the prompt for it. */
+  timeStudyPrompt: import("./storage").TimeStudyPrompt | null;
 }
 
 export interface DrainPayload {
   sessions: import("./session").CompletedSession[];
   infractions: import("./queue").QueuedInfraction[];
   snippets: import("./queue").QueuedSnippet[];
+  timeStudies: import("./queue").QueuedTimeStudy[];
 }
 
 // Reply envelope used both by the service worker to the content script and by

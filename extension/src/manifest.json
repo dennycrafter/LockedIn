@@ -3,6 +3,9 @@
   "name": "LockedIn",
   "description": "Blocks distracting sites during focus sessions and shows a floating timer.",
   "version": "0.1.0",
+  "icons": {
+    "128": "icons/icon-128.png"
+  },
   "action": {
     "default_popup": "popup.html",
     "default_title": "LockedIn"
@@ -14,6 +17,7 @@
     "storage",
     "alarms",
     "contextMenus",
+    "notifications",
     "declarativeNetRequest",
     "declarativeNetRequestWithHostAccess"
   ],

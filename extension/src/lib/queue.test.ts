@@ -4,6 +4,7 @@ import {
   drainQueue,
   enqueueInfraction,
   enqueueSession,
+  enqueueTimeStudy,
   emptyQueue,
   queueIds,
   type QueueState,
@@ -36,6 +37,37 @@ function stateWith(): QueueState {
     infraction("i-1"),
   );
 }
+
+describe("time study queue (SPEC 8.11)", () => {
+  const answer = { id: "ts-1", text: "Writing the T5 PR", occurredAt: "2026-10-09T15:05:00.000Z" };
+
+  it("enqueues answers idempotently and drains them with the rest", () => {
+    const queue = enqueueTimeStudy(enqueueTimeStudy(emptyQueue(), answer), answer);
+    expect(queue.timeStudies).toHaveLength(1);
+    const drained = drainQueue(queue);
+    expect(drained.timeStudies).toEqual([answer]);
+    // Draining changes nothing.
+    expect(queueIds(queue)).toEqual(["ts-1"]);
+  });
+
+  it("answers survive a failed save and leave only after the ack", () => {
+    let queue = enqueueTimeStudy(emptyQueue(), answer);
+    const drained = drainQueue(queue);
+    // A failed save acks nothing: the answer is still queued.
+    expect(queueIds(queue)).toEqual(["ts-1"]);
+    queue = ackQueue(queue, drained.timeStudies.map((t) => t.id));
+    expect(queue.timeStudies).toEqual([]);
+  });
+
+  it("an ack of one kind leaves the others queued", () => {
+    const queue = enqueueTimeStudy(stateWith(), answer);
+    const acked = ackQueue(queue, ["ts-1"]);
+    expect(acked.timeStudies).toEqual([]);
+    expect(acked.sessions).toHaveLength(2);
+    expect(acked.infractions).toHaveLength(1);
+    expect(queueIds(acked)).toEqual(["s-1", "s-2", "i-1"]);
+  });
+});
 
 describe("drain and ack idempotency", () => {
   it("drain returns everything queued without removing it", () => {

@@ -37,10 +37,17 @@ export interface ParsedSnippetRow {
   created_at: string;
 }
 
+export interface ParsedTimeStudyRow {
+  id: string;
+  text: string;
+  occurred_at: string;
+}
+
 export interface ParsedSyncPayload {
   sessions: ParsedSessionRow[];
   infractions: ParsedInfractionRow[];
   snippets: ParsedSnippetRow[];
+  time_studies: ParsedTimeStudyRow[];
 }
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -146,5 +153,25 @@ export function parseSyncPayload(body: unknown): ParsedSyncPayload | null {
     });
   }
 
-  return { sessions, infractions, snippets };
+  const timeStudies = parseTimeStudies(raw.time_studies);
+  if (!timeStudies) return null;
+  return { sessions, infractions, snippets, time_studies: timeStudies };
+}
+
+// Optional so an older extension build (no time studies) still syncs its
+// sessions and infractions. A malformed row rejects the whole payload (same
+// as sessions and infractions), so nothing is silently dropped and acked.
+function parseTimeStudies(raw: unknown): ParsedTimeStudyRow[] | null {
+  if (raw === undefined) return [];
+  if (!Array.isArray(raw)) return null;
+  const rows: ParsedTimeStudyRow[] = [];
+  for (const item of raw) {
+    if (typeof item !== "object" || item === null) return null;
+    const t = item as Record<string, unknown>;
+    if (typeof t.id !== "string" || !UUID_PATTERN.test(t.id)) return null;
+    if (typeof t.text !== "string" || t.text.length === 0 || t.text.length > 500) return null;
+    if (!isIsoTimestamp(t.occurred_at)) return null;
+    rows.push({ id: t.id, text: t.text, occurred_at: t.occurred_at });
+  }
+  return rows;
 }
