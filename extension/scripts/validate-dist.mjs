@@ -59,6 +59,21 @@ for (const file of referencedFiles) {
   }
 }
 
+// Every page shipped in dist must resolve its own script/link references:
+// blocked.html is reached via redirect, not the manifest, so a missing bundle
+// (e.g. blocked.js) only surfaces here.
+for (const page of ["popup.html", "blocked.html"].filter((f) => existsSync(`dist/${f}`))) {
+  const html = readFileSync(`dist/${page}`, "utf8");
+  for (const match of html.matchAll(/(?:src|href)="([^"#]+)"/g)) {
+    const ref = match[1];
+    if (!ref || /^(https?:)?\/\//.test(ref) || ref.startsWith("data:")) continue;
+    const local = ref.replace(/^\//, "");
+    if (!existsSync(`dist/${local}`)) {
+      errors.push(`${page} references ${ref} but dist/${local} is missing`);
+    }
+  }
+}
+
 if (errors.length > 0) {
   console.error(`FAIL: extension dist is not a valid MV3 skeleton:\n${errors.map((e) => `  - ${e}`).join("\n")}`);
   process.exit(1);

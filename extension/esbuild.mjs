@@ -1,9 +1,9 @@
-// Build the LockedIn extension into dist/: three TypeScript entry points plus
-// the static manifest and popup page. `npm run build` runs this once.
+// Build the LockedIn extension into dist/: every TypeScript entry point plus
+// the static manifest and pages. `npm run build` runs this once.
 import * as esbuild from "esbuild";
 import { cpSync, mkdirSync } from "node:fs";
 
-const entryPoints = ["src/popup.ts", "src/service-worker.ts", "src/content-script.ts"];
+const entryPoints = ["src/popup.ts", "src/service-worker.ts", "src/content-script.ts", "src/blocked.ts"];
 
 /** @type {import("esbuild").BuildOptions} */
 const options = {
