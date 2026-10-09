@@ -3,29 +3,125 @@
   <head>
     <meta charset="utf-8" />
     <style>
+      :root {
+        color-scheme: dark;
+        --bg: #0b0b0d;
+        --surface: #121215;
+        --surface-2: #1c1c20;
+        --line: #2a2a30;
+        --fg: #f2f2f4;
+        --muted: #9a9aa3;
+        --accent: #7c5cff;
+        --accent-ink: #9d85ff;
+        --ok: #34d65c;
+        --warn: #ffb547;
+        --bad: #ff6f66;
+      }
       body {
-        width: 240px;
+        width: 250px;
         margin: 0;
         padding: 14px;
-        background: #0b0b0d;
-        color: #f2f2f4;
-        font-family: -apple-system, "Segoe UI", system-ui, sans-serif;
+        background: var(--bg);
+        color: var(--fg);
+        font-family: -apple-system, "Segoe UI", Inter, system-ui, sans-serif;
+        font-size: 13px;
       }
       h1 {
-        margin: 0 0 4px;
+        margin: 0 0 2px;
         font-size: 15px;
         font-weight: 600;
       }
       p {
         margin: 0;
-        color: #9a9aa3;
+        color: var(--muted);
         font-size: 12px;
+      }
+      .row {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        margin-top: 8px;
+      }
+      .dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        flex: none;
+      }
+      .dot.ok {
+        background: var(--ok);
+      }
+      .dot.warn {
+        background: var(--warn);
+      }
+      #session-time {
+        font-family: "Saira", -apple-system, "Segoe UI", sans-serif;
+        font-weight: 600;
+        font-size: 22px;
+        font-variant-numeric: tabular-nums;
+      }
+      input[type="url"] {
+        width: 100%;
+        box-sizing: border-box;
+        margin-top: 4px;
+        padding: 6px 8px;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        background: var(--bg);
+        color: var(--fg);
+        font: inherit;
+      }
+      button {
+        padding: 6px 10px;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        background: var(--surface-2);
+        color: var(--fg);
+        font: inherit;
+        cursor: pointer;
+      }
+      button:hover {
+        border-color: var(--muted);
+      }
+      #open-dashboard {
+        margin-top: 8px;
+        width: 100%;
+        background: var(--accent);
+        border-color: var(--accent);
+        color: #ffffff;
+      }
+      #open-dashboard:hover {
+        background: var(--accent-ink);
+      }
+      #save-note {
+        min-height: 14px;
+        margin-top: 6px;
+      }
+      #save-note.error {
+        color: var(--bad);
       }
     </style>
   </head>
   <body>
     <h1>LockedIn</h1>
-    <p id="version">Extension skeleton</p>
+    <p id="version">v0.1.0</p>
+    <div class="row">
+      <span id="status-dot" class="dot ok" aria-hidden="true"></span>
+      <span id="status-text" role="status">Extension running</span>
+    </div>
+    <div class="row" id="session-box" hidden>
+      <span id="session-time" aria-live="polite">0:00</span>
+      <span id="session-label" style="color: var(--muted)"></span>
+    </div>
+    <div class="row" style="margin-top: 12px">
+      <label for="dashboard-url" style="color: var(--muted)">Dashboard URL</label>
+    </div>
+    <input id="dashboard-url" type="url" placeholder="https://your-app.vercel.app" aria-label="Dashboard URL" />
+    <div class="row">
+      <button id="save-url" type="button">Save</button>
+      <span id="save-note" aria-live="polite"></span>
+    </div>
+    <button id="open-dashboard" type="button">Open dashboard</button>
     <script src="popup.js"></script>
   </body>
 </html>

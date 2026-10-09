@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Blocked</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #0b0b0d;
+        --surface-2: #1c1c20;
+        --line: #2a2a30;
+        --fg: #f2f2f4;
+        --muted: #9a9aa3;
+        --accent: #7c5cff;
+        --accent-ink: #9d85ff;
+        --r: 8px;
+      }
+      html,
+      body {
+        height: 100%;
+      }
+      body {
+        margin: 0;
+        display: grid;
+        place-items: center;
+        background: var(--bg);
+        color: var(--fg);
+        font-family: -apple-system, "Segoe UI", Inter, system-ui, sans-serif;
+      }
+      main {
+        text-align: center;
+        padding: 24px;
+      }
+      .lock {
+        width: 56px;
+        height: 56px;
+        margin: 0 auto 20px;
+        border: 2px solid var(--muted);
+        border-radius: 10px;
+        position: relative;
+      }
+      .lock::before {
+        content: "";
+        position: absolute;
+        top: -22px;
+        left: 50%;
+        width: 28px;
+        height: 26px;
+        transform: translateX(-50%);
+        border: 2px solid var(--muted);
+        border-bottom: none;
+        border-radius: 14px 14px 0 0;
+      }
+      .lock::after {
+        content: "";
+        position: absolute;
+        top: 18px;
+        left: 50%;
+        width: 8px;
+        height: 14px;
+        transform: translateX(-50%);
+        background: var(--accent);
+        border-radius: 2px;
+      }
+      h1 {
+        margin: 0 0 8px;
+        font-size: 28px;
+        font-weight: 600;
+      }
+      #site {
+        margin: 0 0 24px;
+        color: var(--muted);
+        font-size: 15px;
+        word-break: break-all;
+      }
+      #time-left {
+        display: block;
+        margin-bottom: 28px;
+        font-family: "Saira", -apple-system, "Segoe UI", sans-serif;
+        font-size: 44px;
+        font-weight: 600;
+        font-variant-numeric: tabular-nums;
+      }
+      button {
+        padding: 10px 22px;
+        border: 1px solid var(--accent);
+        border-radius: 6px;
+        background: var(--accent);
+        color: #ffffff;
+        font: inherit;
+        font-size: 15px;
+        cursor: pointer;
+      }
+      button:hover {
+        background: var(--accent-ink);
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div class="lock" aria-hidden="true"></div>
+      <h1>Blocked. Back to work.</h1>
+      <p id="site">this site</p>
+      <span id="time-left" aria-live="polite">0:00</span>
+      <button id="back-to-task" type="button">Back to my task</button>
+    </main>
+    <script src="blocked.js" type="module"></script>
+  </body>
+</html>

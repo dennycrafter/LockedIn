@@ -31,16 +31,46 @@ const contentScript = manifest.content_scripts?.[0];
 if (!contentScript || !contentScript.matches?.includes("<all_urls>")) {
   errors.push("content_scripts[0].matches must include <all_urls>");
 }
+// T1: the DNR redirect needs the block page reachable from any page.
+const war = manifest.web_accessible_resources?.[0];
+if (!war || !war.resources?.includes("blocked.html") || !war.matches?.includes("<all_urls>")) {
+  errors.push("web_accessible_resources[0] must expose blocked.html to <all_urls>");
+}
+const dnrPermissions = ["declarativeNetRequest", "declarativeNetRequestWithHostAccess"];
+for (const permission of dnrPermissions) {
+  if (!manifest.permissions?.includes(permission)) {
+    errors.push(`permissions must include ${permission}`);
+  }
+}
+if (!manifest.host_permissions?.includes("<all_urls>")) {
+  errors.push("host_permissions must include <all_urls>");
+}
 
 const referencedFiles = [
   manifest.action?.default_popup,
   manifest.background?.service_worker,
   ...(contentScript?.js ?? []),
+  ...(war?.resources ?? []),
 ].filter((f) => typeof f === "string");
 
 for (const file of referencedFiles) {
   if (!existsSync(`dist/${file}`)) {
     errors.push(`manifest references ${file} but dist/${file} is missing`);
+  }
+}
+
+// Every page shipped in dist must resolve its own script/link references:
+// blocked.html is reached via redirect, not the manifest, so a missing bundle
+// (e.g. blocked.js) only surfaces here.
+for (const page of ["popup.html", "blocked.html"].filter((f) => existsSync(`dist/${f}`))) {
+  const html = readFileSync(`dist/${page}`, "utf8");
+  for (const match of html.matchAll(/(?:src|href)="([^"#]+)"/g)) {
+    const ref = match[1];
+    if (!ref || /^(https?:)?\/\//.test(ref) || ref.startsWith("data:")) continue;
+    const local = ref.replace(/^\//, "");
+    if (!existsSync(`dist/${local}`)) {
+      errors.push(`${page} references ${ref} but dist/${local} is missing`);
+    }
   }
 }
 
