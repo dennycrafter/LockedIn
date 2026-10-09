@@ -1,0 +1,16 @@
+# Dependencies
+node_modules/
+
+# Real env files are never committed; only the .env.example templates stay tracked
+.env*
+!.env.example
+
+# Build outputs
+web/.next/
+web/out/
+extension/dist/
+
+# Misc
+.DS_Store
+*.log
+.vercel
