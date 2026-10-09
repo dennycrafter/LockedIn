@@ -4,8 +4,11 @@
 // dividers, a pencil button that creates one, autosave through NoteEditor,
 // and delete with confirm on the open note. Rows keep their place while
 // editing because the list is ordered by creation, not by edit time.
+// The pop out button opens the note in a 420x640 window; both sides refetch
+// on focus. With projects provided, selecting text offers the attach "+".
 
 import { useCallback, useEffect, useState } from "react";
+import type { ProjectData } from "@/lib/dashboard-data";
 import type { NoteData } from "@/lib/notes";
 import { noteDisplayTitle, notePreview } from "@/lib/notes";
 import { NoteEditor } from "./note-editor";
@@ -15,7 +18,13 @@ function updatedLabel(note: NoteData): string {
   return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
-export function NotesPanel() {
+export function NotesPanel({
+  projects,
+  onAttached,
+}: {
+  projects?: ProjectData[];
+  onAttached?: () => void;
+} = {}) {
   const [notes, setNotes] = useState<NoteData[] | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -37,6 +46,15 @@ export function NotesPanel() {
 
   useEffect(() => {
     void fetchNotes();
+  }, [fetchNotes]);
+
+  // Two-way sync for the pop out (SPEC 8.7): whoever refocuses refetches.
+  useEffect(() => {
+    const onFocus = () => {
+      void fetchNotes();
+    };
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
   }, [fetchNotes]);
 
   const selected = notes?.find((note) => note.id === selectedId) ?? null;
@@ -101,20 +119,63 @@ export function NotesPanel() {
     }
   };
 
+  const openPopout = () => {
+    if (!selected) return;
+    // SPEC 8.7 opens the note in a 420x640 window named lockedin-notes;
+    // reusing the name reuses the same window on repeat clicks.
+    window.open(`/notes/popout?id=${encodeURIComponent(selected.id)}`, "lockedin-notes", "width=420,height=640");
+  };
+
+  const attachSnippet = async (snippet: {
+    ownerType: "project" | "task";
+    ownerId: string;
+    content: string;
+    context: string;
+  }): Promise<void> => {
+    try {
+      const response = await fetch("/api/snippets", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(snippet),
+      });
+      const payload = (await response.json().catch(() => ({}))) as { error?: string };
+      if (!response.ok) {
+        setError(payload.error ?? `Attaching the snippet failed (${response.status})`);
+        return;
+      }
+      setError(null);
+      onAttached?.();
+    } catch {
+      setError("Network request failed.");
+    }
+  };
+
   return (
     <section aria-label="Simple Notes" className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-4">
       <div className="mb-3 flex items-center justify-between gap-2">
         <h2 className="text-sm font-semibold text-[var(--fg)]">Simple Notes</h2>
-        <button
-          type="button"
-          onClick={() => void createNote()}
-          disabled={notes === null}
-          aria-label="New note"
-          title="New note"
-          className="rounded-md px-2 py-1 text-base text-[var(--muted)] hover:bg-[var(--surface-2)] hover:text-[var(--fg)] disabled:opacity-40"
-        >
-          ✎
-        </button>
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={openPopout}
+            disabled={!selected}
+            aria-label="Pop out note"
+            title="Pop out note"
+            className="rounded-md px-2 py-1 text-base text-[var(--muted)] hover:bg-[var(--surface-2)] hover:text-[var(--fg)] disabled:opacity-40"
+          >
+            ⧉
+          </button>
+          <button
+            type="button"
+            onClick={() => void createNote()}
+            disabled={notes === null}
+            aria-label="New note"
+            title="New note"
+            className="rounded-md px-2 py-1 text-base text-[var(--muted)] hover:bg-[var(--surface-2)] hover:text-[var(--fg)] disabled:opacity-40"
+          >
+            ✎
+          </button>
+        </div>
       </div>
 
       {error && <p className="mb-2 text-xs text-[var(--bad)]">{error}</p>}
@@ -155,7 +216,12 @@ export function NotesPanel() {
 
       {selected && (
         <div className="mt-3">
-          <NoteEditor note={selected} onSave={saveNote} label={`Edit note ${noteDisplayTitle(selected.body)}`} />
+          <NoteEditor
+            note={selected}
+            onSave={saveNote}
+            label={`Edit note ${noteDisplayTitle(selected.body)}`}
+            attach={projects ? { projects, onAdded: (snippet) => void attachSnippet(snippet) } : undefined}
+          />
           <div className="mt-2 flex justify-end">
             <button
               type="button"

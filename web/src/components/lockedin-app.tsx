@@ -422,7 +422,13 @@ export function LockedInApp({ initialData }: { initialData: DashboardData }) {
             }}
             error={sitesError}
           />
-          <NotesPanel />
+          <NotesPanel
+            projects={data.projects}
+            onAttached={() => {
+              showToast("Snippet attached");
+              void refetchData();
+            }}
+          />
         </div>
       </div>
 

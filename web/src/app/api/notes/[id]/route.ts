@@ -7,6 +7,31 @@ export const dynamic = "force-dynamic";
 const MAX_BODY_LENGTH = 100_000;
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+// Single note for the pop out window (SPEC 8.7): it opens with ?id= and
+// refetches on focus, so one note is all it needs.
+export async function GET(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  if (!(await isAuthed())) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  const { id } = await params;
+  if (!UUID_PATTERN.test(id)) {
+    return NextResponse.json({ error: "Note id must be a uuid." }, { status: 400 });
+  }
+  const client = createServiceClient();
+  const { data, error } = await client
+    .from("notes")
+    .select("id, body, created_at, updated_at")
+    .eq("id", id)
+    .limit(1);
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+  if (!data || data.length === 0) {
+    return NextResponse.json({ error: "Note not found." }, { status: 404 });
+  }
+  return NextResponse.json({ note: data[0] });
+}
+
 // Autosave writes here (SPEC 8.7): PATCH stores the body and bumps
 // updated_at; DELETE removes the note after the panel's confirmation.
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
