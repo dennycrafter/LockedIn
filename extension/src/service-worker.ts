@@ -6,6 +6,7 @@
 
 import { ackQueue, drainQueue, enqueueSession, queueIds } from "./lib/queue";
 import { isUuid, toCompletedSession, type ActiveSession } from "./lib/session";
+import { applyBlockingRules, clearBlockingRules, isBlockingSession } from "./lib/blocking";
 import {
   getActiveSession,
   getBlockedSites,
@@ -118,12 +119,32 @@ async function checkExpiredSession(): Promise<void> {
   }
 }
 
+// Keeps DNR rules in sync with (active session, blocked sites): install the
+// per-domain redirects while a soft/hard session runs, remove them otherwise.
+async function reassertBlocking(): Promise<void> {
+  const [session, domains] = await Promise.all([getActiveSession(), getBlockedSites()]);
+  if (isBlockingSession(session)) {
+    await applyBlockingRules(domains);
+  } else {
+    await clearBlockingRules();
+  }
+}
+
 // --- bridge dispatch -------------------------------------------------------
 
 async function handle(method: string, payload: unknown): Promise<BridgeResponse> {
-  await withStateLock(async () => {
+  return withStateLock(async () => {
+    // The alarm may fire late or be missed while the worker sleeps, so every
+    // message also checks for an expired session before acting.
     await checkExpiredSession();
+    const response = await route(method, payload);
+    // State may have changed above; make the DNR rules match it.
+    await reassertBlocking();
+    return response;
   });
+}
+
+async function route(method: string, payload: unknown): Promise<BridgeResponse> {
   switch (method) {
     case "ping":
       return ok({ version: chrome.runtime.getManifest().version, connected: true });
@@ -138,11 +159,11 @@ async function handle(method: string, payload: unknown): Promise<BridgeResponse>
             .filter((d): d is string => d !== null),
         ),
       ].sort();
-      await withStateLock(() => setBlockedSites(domains));
+      await setBlockedSites(domains);
       return ok({ domains });
     }
     case "startSession":
-      return withStateLock(() => handleStartSession(payload));
+      return handleStartSession(payload);
     case "getState": {
       const session = await getActiveSession();
       return ok({ session, softUnlockAt: null });
@@ -156,15 +177,13 @@ async function handle(method: string, payload: unknown): Promise<BridgeResponse>
       if (!Array.isArray(raw) || !raw.every((id) => typeof id === "string")) {
         return fail("ids must be a list of strings.");
       }
-      return withStateLock(async () => {
-        const queue = await getQueue();
-        const next = ackQueue(queue, raw as string[]);
-        await setQueue(next);
-        return ok({ remaining: queueIds(next).length });
-      });
+      const queue = await getQueue();
+      const next = ackQueue(queue, raw as string[]);
+      await setQueue(next);
+      return ok({ remaining: queueIds(next).length });
     }
     case "requestEnd":
-      return withStateLock(() => handleRequestEnd());
+      return handleRequestEnd();
     default:
       return fail(`Unknown method: ${method}`);
   }
@@ -178,15 +197,21 @@ chrome.runtime.onMessage.addListener((request: WorkerRequest, _sender, sendRespo
 
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === SESSION_END_ALARM) {
-    void withStateLock(() => checkExpiredSession());
+    void withStateLock(async () => {
+      await checkExpiredSession();
+      await reassertBlocking();
+    });
   }
 });
 
-// After install, browser restart or worker sleep, re-read state: expire a
-// finished session so a missed alarm cannot leave a stuck lock. Blocking
-// rules are re-asserted from the next commit.
+// After install or browser restart, re-read state: expire a finished session
+// so a missed alarm cannot leave a stuck lock, and make the DNR rules match
+// what storage says.
 async function reconcileOnWake(): Promise<void> {
-  await withStateLock(() => checkExpiredSession());
+  await withStateLock(async () => {
+    await checkExpiredSession();
+    await reassertBlocking();
+  });
 }
 
 chrome.runtime.onInstalled.addListener(() => {

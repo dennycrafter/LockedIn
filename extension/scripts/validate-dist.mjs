@@ -31,11 +31,26 @@ const contentScript = manifest.content_scripts?.[0];
 if (!contentScript || !contentScript.matches?.includes("<all_urls>")) {
   errors.push("content_scripts[0].matches must include <all_urls>");
 }
+// T1: the DNR redirect needs the block page reachable from any page.
+const war = manifest.web_accessible_resources?.[0];
+if (!war || !war.resources?.includes("blocked.html") || !war.matches?.includes("<all_urls>")) {
+  errors.push("web_accessible_resources[0] must expose blocked.html to <all_urls>");
+}
+const dnrPermissions = ["declarativeNetRequest", "declarativeNetRequestWithHostAccess"];
+for (const permission of dnrPermissions) {
+  if (!manifest.permissions?.includes(permission)) {
+    errors.push(`permissions must include ${permission}`);
+  }
+}
+if (!manifest.host_permissions?.includes("<all_urls>")) {
+  errors.push("host_permissions must include <all_urls>");
+}
 
 const referencedFiles = [
   manifest.action?.default_popup,
   manifest.background?.service_worker,
   ...(contentScript?.js ?? []),
+  ...(war?.resources ?? []),
 ].filter((f) => typeof f === "string");
 
 for (const file of referencedFiles) {

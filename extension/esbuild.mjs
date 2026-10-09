@@ -27,5 +27,6 @@ if (process.argv.includes("--watch")) {
   await esbuild.build(options);
   cpSync("src/manifest.json", "dist/manifest.json");
   cpSync("src/popup.html", "dist/popup.html");
+  cpSync("src/blocked.html", "dist/blocked.html");
   console.log("Extension built to dist/");
 }
