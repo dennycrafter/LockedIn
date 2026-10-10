@@ -30,6 +30,7 @@ Supabase stores all of your data. The project is created by hand in the Supabase
 4. Get the schema text: in another Chrome tab, open https://github.com/dennycrafter/LockedIn/blob/main/supabase/schema.sql and click the **Copy raw file** button (or open the Raw view, select all, copy).
 5. Back in Supabase, paste the text into the SQL editor and click **Run**. It should say **Success**. This creates 15 tables and one default settings row.
    - If you ever run it a second time, it shows "already exists" errors. That is harmless: it means the schema is already in place.
+   - Later releases can ship extra change files under `supabase/migrations` (numbered). If a release note says "needs running on real Supabase", paste and run those files in the SQL editor too, in number order. See `supabase/README.md`.
 6. Copy the two values you will need in section 3. Click **Project Settings** (the gear icon) > **API**:
    - **Project URL**: a link like `https://xxxx.supabase.co`. This becomes `SUPABASE_URL`.
    - **API keys > service_role > secret key**: click Reveal and copy. This becomes `SUPABASE_SERVICE_ROLE_KEY`. Treat it like a master key: never share it, never put it in a website or the extension.
