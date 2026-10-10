@@ -23,6 +23,7 @@ import { ProfileMenu } from "./profile-menu";
 import { ProjectsPanel, type ProjectsPanelHandlers } from "./projects-panel";
 import { SessionPanel } from "./session-panel";
 import { StartSessionDialog } from "./start-session-dialog";
+import { StuckModal } from "./stuck-modal";
 import { StatsStrip } from "./stats-strip";
 import { TimeStudyPanel } from "./time-study-panel";
 import { TimeStudyPromptCard } from "./time-study-prompt";
@@ -667,6 +668,19 @@ export function LockedInApp({ initialData }: { initialData: DashboardData }) {
               // Existing dialog only pre-targets misc items; task targeting
               // lands with T3's row timer work (SPEC 8.4).
               if (item.kind === "misc") setStartMiscTask({ id: item.id, title: item.title });
+              setStartOpen(true);
+            }}
+          />
+          <StuckModal
+            projects={data.projects}
+            onToast={showToast}
+            onChanged={() => void refetchData()}
+            onStartTask={(taskId) => {
+              // Same handoff the organize flow uses: pre-target the existing
+              // start dialog; with no task picked, open it clean.
+              setStartMiscTask(null);
+              if (taskId) startOnTask(taskId);
+              else setStartWith(null);
               setStartOpen(true);
             }}
           />
