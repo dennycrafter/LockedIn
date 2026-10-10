@@ -98,7 +98,7 @@ export function CelebrationOverlay({
         ))}
         <p
           className="lockedin-slam text-2xl font-semibold text-[var(--fg)] sm:text-3xl"
-          style={{ fontFamily: "var(--font-saira), inherit" }}
+          style={{ fontFamily: "var(--font-saira), ui-sans-serif, system-ui, sans-serif" }}
         >
           {celebrationMessage(style, name)}
         </p>

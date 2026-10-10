@@ -9,10 +9,11 @@ import type { ExtensionSession } from "@/lib/extension-session";
 import { formatCountdown, sessionRemainingMs } from "@/lib/extension-session";
 import { sessionPhase } from "@/lib/session-phase";
 
-function lockPillStyle(lockMode: ExtensionSession["lockMode"]): { background: string; color: string } {
-  if (lockMode === "hard") return { background: "color-mix(in srgb, var(--bad) 18%, transparent)", color: "var(--bad)" };
-  if (lockMode === "soft") return { background: "color-mix(in srgb, var(--warn) 18%, transparent)", color: "var(--warn)" };
-  return { background: "color-mix(in srgb, var(--info) 18%, transparent)", color: "var(--info)" };
+// Lock mode is a status, not an alert: the pill keeps its shape but loses the
+// colored fill per the owner's rule that colour is reserved for things
+// needing attention (dots for overdue, infractions, errors).
+function lockPillStyle(): { background: string; color: string } {
+  return { background: "var(--surface-2)", color: "var(--fg)" };
 }
 
 export function SessionPanel({
@@ -40,7 +41,7 @@ export function SessionPanel({
   // While ending, the number that matters is when the sites unlock again.
   const unlockRemaining =
     ending && softUnlockAtMs !== null ? formatCountdown(Math.max(0, softUnlockAtMs - nowMs)) : null;
-  const pill = lockPillStyle(session.lockMode);
+  const pill = lockPillStyle();
 
   return (
     <section aria-label="Active session" className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-4">
@@ -53,7 +54,7 @@ export function SessionPanel({
 
       <div
         className="mt-2 text-6xl tracking-tight text-[var(--fg)]"
-        style={{ fontFamily: "var(--font-saira), inherit" }}
+        style={{ fontFamily: "var(--font-saira), ui-sans-serif, system-ui, sans-serif" }}
         role="timer"
         aria-label={ending ? `Sites unlock in ${unlockRemaining}` : `Time remaining ${remaining}`}
       >

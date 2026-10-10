@@ -42,7 +42,7 @@ const RATING_BUTTON = "rounded-md border px-3 py-1.5 text-sm disabled:opacity-40
 
 function ratingButtonStyle(active: boolean): React.CSSProperties {
   return active
-    ? { borderColor: "var(--accent-ink)", color: "var(--accent-ink)" }
+    ? { borderColor: "var(--muted)", color: "var(--fg)" }
     : { borderColor: "var(--line)", color: "var(--fg)" };
 }
 
@@ -341,7 +341,7 @@ export function OrganizeModal({
                         className="h-4 w-4 accent-[var(--accent)]"
                       />
                       <span className="min-w-0 flex-1 truncate text-sm text-[var(--fg)]">{item.label}</span>
-                      <span className="rounded-full border border-[var(--line)] px-2 py-0.5 text-[10px] text-[var(--muted)]">
+                      <span className="text-xs text-[var(--muted)]">
                         misc
                       </span>
                     </li>
@@ -388,7 +388,7 @@ export function OrganizeModal({
                 setStep("rate");
               }}
               className="rounded-md px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-              style={{ background: "var(--accent)" }}
+              style={{ background: "var(--accent-strong)" }}
             >
               Next
             </button>
@@ -464,7 +464,7 @@ export function OrganizeModal({
                 else setRateIndex(rateIndex + 1);
               }}
               className="rounded-md px-4 py-2 text-sm font-medium text-white"
-              style={{ background: "var(--accent)" }}
+              style={{ background: "var(--accent-strong)" }}
             >
               {isLastRating ? "Rank them" : "Next"}
             </button>
@@ -489,7 +489,7 @@ export function OrganizeModal({
                     {entry.rating.impact} · effort {entry.rating.effort}
                   </span>
                 </span>
-                <span className="shrink-0 text-base font-medium" style={{ color: "var(--accent-ink)" }}>
+                <span className="shrink-0 text-base font-medium text-[var(--fg)]">
                   {entry.score}
                 </span>
               </li>
@@ -510,7 +510,7 @@ export function OrganizeModal({
               disabled={planBusy || top?.item.kind === "misc"}
               title={top?.item.kind === "misc" ? "Misc tasks cannot go in the plan." : undefined}
               className="rounded-md px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-              style={{ background: "var(--accent)" }}
+              style={{ background: "var(--accent-strong)" }}
             >
               Make #1 my most important task
             </button>

@@ -119,7 +119,7 @@ export function ProfileMenu({
                   className="rounded-md border px-3 py-1.5 text-sm"
                   style={
                     settings.completion_style === option.value
-                      ? { borderColor: "var(--accent-ink)", color: "var(--accent-ink)" }
+                      ? { borderColor: "var(--muted)", color: "var(--fg)" }
                       : { borderColor: "var(--line)", color: "var(--fg)" }
                   }
                 >

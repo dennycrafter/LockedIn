@@ -66,7 +66,7 @@ function Stat({ label, value, first }: { label: string; value: string; first: bo
       <div className="truncate text-xs uppercase tracking-wide text-[var(--muted)]">{label}</div>
       <div
         className="truncate text-2xl text-[var(--fg)]"
-        style={{ fontFamily: "var(--font-saira), inherit" }}
+        style={{ fontFamily: "var(--font-saira), ui-sans-serif, system-ui, sans-serif" }}
       >
         {value}
       </div>
@@ -116,7 +116,7 @@ export function StatsStrip({
                 <span className="w-40 shrink-0 truncate text-[var(--fg)]">{row.name}</span>
                 <span className="h-2 flex-1 overflow-hidden rounded-sm bg-[var(--surface-2)]">
                   <span
-                    className="block h-full rounded-sm bg-[var(--accent)]"
+                    className="block h-full rounded-sm bg-[var(--muted)]"
                     style={{ width: `${Math.round((row.minutes / maxMinutes) * 100)}%` }}
                   />
                 </span>

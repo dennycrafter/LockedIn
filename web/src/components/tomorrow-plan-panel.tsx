@@ -16,7 +16,7 @@ import {
 } from "@/lib/tomorrow-plan";
 
 const POLL_MS = 15_000;
-const ICON_BUTTON = "shrink-0 px-1 text-xs text-[var(--muted)] hover:text-[var(--fg)]";
+const ICON_BUTTON = "inline-flex h-6 min-w-6 shrink-0 items-center justify-center gap-0.5 px-1 text-xs text-[var(--muted)] hover:text-[var(--fg)]";
 
 export function TomorrowPlanPanel({
   startDisabled,

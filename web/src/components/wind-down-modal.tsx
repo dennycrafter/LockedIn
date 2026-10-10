@@ -36,9 +36,9 @@ function ChoiceButton({
       onClick={onClick}
       className="rounded-md border px-4 py-2 text-sm"
       style={{
-        borderColor: active ? "var(--accent-ink)" : "var(--line)",
+        borderColor: active ? "var(--muted)" : "var(--line)",
         color: active === false ? "var(--muted)" : "var(--fg)",
-        background: active ? "color-mix(in srgb, var(--accent) 18%, transparent)" : "transparent",
+        background: active ? "var(--surface-2)" : "transparent",
       }}
     >
       {label}
@@ -571,7 +571,7 @@ export default function WindDownSection() {
                     onClick={() => dispatch({ type: "next" })}
                     disabled={isSaving}
                     className="rounded-md px-4 py-1.5 text-sm font-medium text-white disabled:opacity-50"
-                    style={{ background: "var(--accent)" }}
+                    style={{ background: "var(--accent-strong)" }}
                   >
                     {draft.step === 7 ? "Task list finished" : "Next"}
                   </button>
@@ -581,7 +581,7 @@ export default function WindDownSection() {
                     onClick={() => void save()}
                     disabled={isSaving}
                     className="rounded-md px-4 py-1.5 text-sm font-medium text-white disabled:opacity-50"
-                    style={{ background: "var(--accent)" }}
+                    style={{ background: "var(--accent-strong)" }}
                   >
                     {isSaving ? "Saving..." : "Ready for tomorrow"}
                   </button>

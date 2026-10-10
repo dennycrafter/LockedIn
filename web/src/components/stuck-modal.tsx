@@ -312,7 +312,7 @@ export function StuckModal({
               type="button"
               onClick={goSuggest}
               className="rounded-md px-4 py-2 text-sm font-medium text-white"
-              style={{ background: "var(--accent)" }}
+              style={{ background: "var(--accent-strong)" }}
             >
               Next
             </button>
@@ -347,7 +347,7 @@ export function StuckModal({
                 type="button"
                 onClick={startFiveMinutes}
                 className="rounded-md px-4 py-2 text-sm font-medium text-white"
-                style={{ background: "var(--accent)" }}
+                style={{ background: "var(--accent-strong)" }}
               >
                 Start 5 minutes
               </button>
@@ -380,8 +380,7 @@ export function StuckModal({
                       type="button"
                       onClick={() => void addSubtask()}
                       disabled={subtaskTitle.trim() === "" || subtaskBusy}
-                      className="rounded-md px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-                      style={{ background: "var(--accent)" }}
+                      className="rounded-md border border-[var(--line)] px-4 py-2 text-sm text-[var(--fg)] transition-colors hover:border-[var(--muted)] disabled:opacity-50"
                     >
                       Add subtask
                     </button>
@@ -417,7 +416,7 @@ export function StuckModal({
                   onClick={() => void parkLoop()}
                   disabled={loopText.trim() === "" || loopBusy}
                   className="rounded-md px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-                  style={{ background: "var(--accent)" }}
+                  style={{ background: "var(--accent-strong)" }}
                 >
                   Park it as an open loop
                 </button>
