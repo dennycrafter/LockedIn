@@ -70,8 +70,16 @@ function Stat({ label, value, index }: { label: string; value: string; index: nu
     >
       <div className="text-xs uppercase leading-snug tracking-wide text-[var(--muted)]">{label}</div>
       <div
-        className="break-words text-2xl leading-tight text-[var(--fg)]"
-        style={{ fontFamily: "var(--font-saira), ui-sans-serif, system-ui, sans-serif" }}
+        className="break-words leading-tight text-[var(--fg)]"
+        style={
+          value.length <= 8
+            ? {
+                // Big numbers get Saira at 2xl (SPEC 10: display font only for digits).
+                fontFamily: "var(--font-saira), ui-sans-serif, system-ui, sans-serif",
+                fontSize: "1.5rem",
+              }
+            : { fontSize: "1rem" }
+        }
       >
         {value}
       </div>
