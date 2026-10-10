@@ -8,6 +8,9 @@ import { chicagoTodayStart } from "@/lib/time";
 
 export type CelebrationStyle = "dramatic" | "hype" | "calm";
 
+/** SPEC 8.15: which mode the helper flows open in; the settings toggle is the source of truth. */
+export type HelperMode = "scripted" | "ai";
+
 export interface SettingsData {
   display_name: string;
   completion_style: CelebrationStyle;
@@ -15,6 +18,8 @@ export interface SettingsData {
   time_study_minutes: number | null;
   /** Evening wind-down reminder target, free text like "21:30" (SPEC 8.12). */
   wind_down_time: string;
+  /** Helper flow open mode (SPEC 8.15); AI mode additionally needs the Anthropic key. */
+  helper_mode: HelperMode;
 }
 
 export interface LinkData {
@@ -111,7 +116,34 @@ export const DEFAULT_SETTINGS: SettingsData = {
   completion_style: "dramatic",
   time_study_minutes: null,
   wind_down_time: "",
+  helper_mode: "scripted",
 };
+
+/** Raw settings row shape as selected from the settings table (single row, id=1). */
+export interface SettingsRowData {
+  display_name: string;
+  completion_style: string;
+  time_study_minutes: number | null;
+  wind_down_time: string | null;
+  helper_mode: string | null;
+}
+
+/** Column list shared by every settings select so all readers agree. */
+export const SETTINGS_COLUMNS = "display_name, completion_style, time_study_minutes, wind_down_time, helper_mode";
+
+/** Pure mapping from the database row to the settings the client renders. Any
+ * unexpected helper_mode value falls back to scripted so a hand-edited row
+ * cannot break the dashboard. */
+export function mapSettingsRow(row: SettingsRowData | null | undefined): SettingsData {
+  if (!row) return DEFAULT_SETTINGS;
+  return {
+    display_name: row.display_name,
+    completion_style: row.completion_style as CelebrationStyle,
+    time_study_minutes: row.time_study_minutes ?? null,
+    wind_down_time: row.wind_down_time ?? "",
+    helper_mode: row.helper_mode === "ai" ? "ai" : "scripted",
+  };
+}
 
 interface LinkRow {
   id: string;
@@ -175,7 +207,7 @@ export async function loadDashboardData(): Promise<DashboardData> {
 
   const [settingsRes, projectsRes, tasksRes, linksRes, snippetsRes, sitesRes, loopsRes, miscRes, sessionsRes, infractionsRes, timeStudiesRes] =
     await Promise.all([
-      client.from("settings").select("display_name, completion_style, time_study_minutes, wind_down_time").eq("id", 1).limit(1),
+      client.from("settings").select(SETTINGS_COLUMNS).eq("id", 1).limit(1),
       client.from("projects").select("id, name, notes, position").order("position"),
       client
         .from("tasks")
@@ -221,14 +253,7 @@ export async function loadDashboardData(): Promise<DashboardData> {
   const timeStudyRows = timeStudiesRes.data ?? [];
 
   const settingsRow = settingsRes.data?.[0];
-  const settings: SettingsData = settingsRow
-    ? {
-        display_name: settingsRow.display_name,
-        completion_style: settingsRow.completion_style as CelebrationStyle,
-        time_study_minutes: settingsRow.time_study_minutes ?? null,
-        wind_down_time: settingsRow.wind_down_time ?? "",
-      }
-    : DEFAULT_SETTINGS;
+  const settings = mapSettingsRow(settingsRow as SettingsRowData | null);
 
   const linksByOwner = distribute(linkRows, (row) => ({ id: row.id, name: row.name, url: row.url }));
   // note_snippets arrive newest first (created_at desc); keep that order.

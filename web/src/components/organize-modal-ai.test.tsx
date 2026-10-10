@@ -207,3 +207,30 @@ describe("OrganizeModal AI ranked actions", () => {
     expect(props.onStartItem).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("OrganizeModal configured helper mode (SPEC 8.15 settings default)", () => {
+  it("opens straight into AI mode when the settings default is ai", () => {
+    renderModal({ initialMode: "ai" });
+    fireEvent.click(screen.getByRole("button", { name: "Organize" }));
+
+    expect(screen.getByText("AI organize mode")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Let AI organize instead" })).toBeNull();
+    expect(screen.getByLabelText("Message the AI organizer")).toBeTruthy();
+  });
+
+  it("still switches to scripted from a configured AI default", () => {
+    renderModal({ initialMode: "ai" });
+    fireEvent.click(screen.getByRole("button", { name: "Organize" }));
+    fireEvent.click(screen.getByRole("button", { name: "Switch to scripted" }));
+
+    expect(screen.getByText("Dump everything you could work on.")).toBeTruthy();
+  });
+
+  it("keeps the scripted default when no helper mode is configured", () => {
+    renderModal();
+    fireEvent.click(screen.getByRole("button", { name: "Organize" }));
+
+    expect(screen.getByText("Dump everything you could work on.")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Let AI organize instead" })).toBeTruthy();
+  });
+});

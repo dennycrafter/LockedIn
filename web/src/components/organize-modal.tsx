@@ -84,6 +84,7 @@ export function OrganizeModal({
   onToast,
   onChanged,
   onStartItem,
+  initialMode,
 }: {
   projects: ProjectData[];
   miscTasks: MiscTaskData[];
@@ -93,6 +94,9 @@ export function OrganizeModal({
   onChanged: () => void;
   /** Opens the existing start dialog on this item (SPEC 8.14 step 4). */
   onStartItem: (item: OrganizeItem) => void;
+  /** SPEC 8.15: the configured helper mode decides how the modal opens; the
+   * in-modal switch still works within an open session. */
+  initialMode?: "scripted" | "ai";
 }) {
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<"scripted" | "ai">("scripted");
@@ -129,7 +133,7 @@ export function OrganizeModal({
   const top = ranked[0] ?? null;
 
   const openFresh = () => {
-    setMode("scripted");
+    setMode(initialMode ?? "scripted");
     setStep("dump");
     setCheckedIds(new Set());
     setRatings({});

@@ -166,6 +166,33 @@ describe("StuckModal AI start handoff", () => {
   });
 });
 
+describe("StuckModal configured helper mode (SPEC 8.15 settings default)", () => {
+  it("opens straight into AI mode when the settings default is ai", () => {
+    renderModal({ initialMode: "ai" });
+    fireEvent.click(screen.getByRole("button", { name: "Help me start" }));
+
+    expect(screen.getByText("AI coach mode")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Ask AI to coach me instead" })).toBeNull();
+    expect(screen.getByLabelText("Message the AI coach")).toBeTruthy();
+  });
+
+  it("still switches to scripted from a configured AI default", () => {
+    renderModal({ initialMode: "ai" });
+    fireEvent.click(screen.getByRole("button", { name: "Help me start" }));
+    fireEvent.click(screen.getByRole("button", { name: "Switch to scripted" }));
+
+    expect(screen.getByText("First, a quick check-in.")).toBeTruthy();
+  });
+
+  it("keeps the scripted default when no helper mode is configured", () => {
+    renderModal();
+    fireEvent.click(screen.getByRole("button", { name: "Help me start" }));
+
+    expect(screen.getByText("First, a quick check-in.")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Ask AI to coach me instead" })).toBeTruthy();
+  });
+});
+
 describe("StuckModal AI errors and cancel", () => {
   it("surfaces the typed error inline and retries with the transcript intact", async () => {
     const fetchMock = vi

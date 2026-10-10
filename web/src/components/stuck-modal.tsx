@@ -85,6 +85,7 @@ export function StuckModal({
   onToast,
   onChanged,
   onStartTask,
+  initialMode,
 }: {
   projects: ProjectData[];
   /** Success and failure messages surface through the dashboard toast. */
@@ -93,6 +94,9 @@ export function StuckModal({
   onChanged: () => void;
   /** Hands the picked task to the existing start dialog (T7a handoff pattern). */
   onStartTask: (taskId: string | null) => void;
+  /** SPEC 8.15: the configured helper mode decides how the modal opens; the
+   * in-modal switch still works within an open session. */
+  initialMode?: "scripted" | "ai";
 }) {
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<"scripted" | "ai">("scripted");
@@ -128,7 +132,7 @@ export function StuckModal({
   );
 
   const openFresh = () => {
-    setMode("scripted");
+    setMode(initialMode ?? "scripted");
     setStep("checkin");
     setSelectedId("");
     setWorkedOn("");

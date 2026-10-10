@@ -1,11 +1,11 @@
 "use client";
 
-// Profile menu (SPEC 10 top bar): Display name, Completion message and the
-// wind-down time target (SPEC 8.12) here; Lock is the existing logout. Helper
-// mode arrives with T8.
+// Profile menu (SPEC 10 top bar): Display name, Completion message, Helper
+// mode (SPEC 8.15) and the wind-down time target (SPEC 8.12) here; Lock is
+// the existing logout.
 
 import { useEffect, useRef, useState } from "react";
-import type { CelebrationStyle, SettingsData } from "@/lib/dashboard-data";
+import type { CelebrationStyle, HelperMode, SettingsData } from "@/lib/dashboard-data";
 import { celebrationMessage } from "@/lib/celebration";
 
 const STYLE_OPTIONS: Array<{ value: CelebrationStyle; label: string }> = [
@@ -14,14 +14,28 @@ const STYLE_OPTIONS: Array<{ value: CelebrationStyle; label: string }> = [
   { value: "calm", label: "Calm" },
 ];
 
+const HELPER_MODE_OPTIONS: Array<{ value: HelperMode; label: string }> = [
+  { value: "scripted", label: "Scripted" },
+  { value: "ai", label: "AI" },
+];
+
 export function ProfileMenu({
   settings,
+  aiAvailable,
   error,
   onSave,
 }: {
   settings: SettingsData;
+  /** Server-computed Anthropic key presence (GET /api/settings); the toggle
+   * needs it because the browser cannot read env vars (SPEC 8.15). */
+  aiAvailable: boolean;
   error: string | null;
-  onSave: (next: { display_name?: string; completion_style?: CelebrationStyle; wind_down_time?: string }) => void;
+  onSave: (next: {
+    display_name?: string;
+    completion_style?: CelebrationStyle;
+    helper_mode?: HelperMode;
+    wind_down_time?: string;
+  }) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [nameDraft, setNameDraft] = useState(settings.display_name);
@@ -116,6 +130,39 @@ export function ProfileMenu({
             <p className="mt-2 text-xs text-[var(--muted)]">
               {celebrationMessage(settings.completion_style, settings.display_name)}
             </p>
+          </fieldset>
+
+          <fieldset className="mt-4">
+            <legend className="text-sm text-[var(--muted)]">Helper mode</legend>
+            <div className="mt-1 flex flex-wrap gap-2">
+              {HELPER_MODE_OPTIONS.map((option) => {
+                // SPEC 8.15: AI needs the Anthropic key configured in Vercel;
+                // without it the button is disabled with the hint below.
+                const disabled = option.value === "ai" && !aiAvailable;
+                return (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => {
+                      if (option.value !== settings.helper_mode) onSave({ helper_mode: option.value });
+                    }}
+                    disabled={disabled}
+                    aria-pressed={settings.helper_mode === option.value}
+                    className="rounded-md border px-3 py-1.5 text-sm disabled:opacity-50"
+                    style={
+                      settings.helper_mode === option.value
+                        ? { borderColor: "var(--accent-ink)", color: "var(--accent-ink)" }
+                        : { borderColor: "var(--line)", color: "var(--fg)" }
+                    }
+                  >
+                    {option.label}
+                  </button>
+                );
+              })}
+            </div>
+            {!aiAvailable && (
+              <p className="mt-2 text-xs text-[var(--muted)]">Add your Anthropic key in Vercel to turn this on</p>
+            )}
           </fieldset>
 
           <form

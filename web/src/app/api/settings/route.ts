@@ -2,16 +2,36 @@ import { NextResponse, type NextRequest } from "next/server";
 import { isAuthed } from "@/lib/require-user";
 import { createServiceClient } from "@/lib/supabase";
 import { isTimeStudyChoice } from "@/lib/time-study";
+import { mapSettingsRow, SETTINGS_COLUMNS, type HelperMode } from "@/lib/dashboard-data";
 
 export const dynamic = "force-dynamic";
 
 const STYLES = ["dramatic", "hype", "calm"] as const;
+const HELPER_MODES = ["scripted", "ai"] as const;
 
 // Settings row (single row, id=1): display name for the greeting and the
-// celebration message, completion message style (SPEC 8.10), and the time
-// study check-in interval (SPEC 8.11), and the wind down evening reminder
-// target (T6a-1). Other settings fields land with their own tickets (default
-// minutes T3, helper mode T8).
+// celebration message, completion message style (SPEC 8.10), the time
+// study check-in interval (SPEC 8.11), the wind down evening reminder
+// target (T6a-1), and the helper flow open mode (SPEC 8.15, T8).
+
+// GET /api/settings: the settings row plus a computed aiAvailable flag, so
+// the settings toggle knows whether the Anthropic key is configured. The
+// key itself never leaves the server (SPEC 8.15, SPEC 12).
+export async function GET() {
+  if (!(await isAuthed())) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  const client = createServiceClient();
+  const { data, error } = await client.from("settings").select(SETTINGS_COLUMNS).eq("id", 1).limit(1);
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+  return NextResponse.json({
+    settings: mapSettingsRow(data?.[0] as Parameters<typeof mapSettingsRow>[0]),
+    aiAvailable: Boolean(process.env.ANTHROPIC_API_KEY),
+  });
+}
+
 export async function PATCH(request: NextRequest) {
   if (!(await isAuthed())) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -27,6 +47,7 @@ export async function PATCH(request: NextRequest) {
     completion_style?: unknown;
     time_study_minutes?: unknown;
     wind_down_time?: unknown;
+    helper_mode?: unknown;
   };
 
   const update: {
@@ -34,6 +55,7 @@ export async function PATCH(request: NextRequest) {
     completion_style?: (typeof STYLES)[number];
     time_study_minutes?: number | null;
     wind_down_time?: string;
+    helper_mode?: HelperMode;
   } = {};
   if (raw.display_name !== undefined) {
     if (typeof raw.display_name !== "string" || raw.display_name.trim() === "") {
@@ -64,6 +86,15 @@ export async function PATCH(request: NextRequest) {
     }
     update.wind_down_time = raw.wind_down_time.trim().slice(0, 60);
   }
+  if (raw.helper_mode !== undefined) {
+    // SPEC 8.15: which mode the helper flows open in. The client only offers
+    // AI when the key is configured (aiAvailable), and the server-side
+    // /api/ai enforces that again, so a stale client cannot spend credits.
+    if (typeof raw.helper_mode !== "string" || !HELPER_MODES.includes(raw.helper_mode as HelperMode)) {
+      return NextResponse.json({ error: "Helper mode must be scripted or ai." }, { status: 400 });
+    }
+    update.helper_mode = raw.helper_mode as HelperMode;
+  }
   if (Object.keys(update).length === 0) {
     return NextResponse.json({ error: "Nothing to update." }, { status: 400 });
   }
@@ -73,7 +104,7 @@ export async function PATCH(request: NextRequest) {
     .from("settings")
     .update(update)
     .eq("id", 1)
-    .select("display_name, completion_style, time_study_minutes, wind_down_time");
+    .select(SETTINGS_COLUMNS);
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
