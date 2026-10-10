@@ -64,6 +64,39 @@ create table notes (
   updated_at timestamptz not null default now()
 );
 
+-- Deleting a project or task removes its links and note_snippets too
+-- (SPEC 8.2: "Deleting a project ... cascades"). The owner columns are
+-- polymorphic (project or task) and cannot carry a foreign key, so this
+-- trigger is the ON DELETE CASCADE equivalent: atomic with the delete and
+-- effective for every delete path. Cascaded deletes fire row-level triggers
+-- as well, so a project delete also cleans its tasks' and subtasks' rows.
+-- Session history is kept on purpose (sessions.task_id / project_id are
+-- ON DELETE SET NULL).
+create or replace function delete_owner_links_and_snippets() returns trigger
+language plpgsql as $$
+begin
+  -- owner_type stores the singular kind ('project' | 'task'); TG_TABLE_NAME
+  -- is the plural table name this trigger fired on.
+  delete from links
+    where owner_type = (case tg_table_name when 'projects' then 'project' when 'tasks' then 'task' end)
+      and owner_id = old.id;
+  delete from note_snippets
+    where owner_type = (case tg_table_name when 'projects' then 'project' when 'tasks' then 'task' end)
+      and owner_id = old.id;
+  return old;
+end;
+$$;
+
+drop trigger if exists delete_owner_links_snippets on projects;
+create trigger delete_owner_links_snippets
+  after delete on projects
+  for each row execute function delete_owner_links_and_snippets();
+
+drop trigger if exists delete_owner_links_snippets on tasks;
+create trigger delete_owner_links_snippets
+  after delete on tasks
+  for each row execute function delete_owner_links_and_snippets();
+
 create table blocked_sites (
   id uuid primary key default gen_random_uuid(),
   domain text not null unique,

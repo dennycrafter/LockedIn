@@ -4,8 +4,10 @@ import { createServiceClient } from "@/lib/supabase";
 
 export const dynamic = "force-dynamic";
 
-// Deleting a project cascades to its tasks (schema on delete cascade); the UI
-// asks for confirmation first.
+// Deleting a project cascades to its tasks (schema on delete cascade) and
+// the delete_owner_links_snippets trigger removes the project's and its
+// tasks' links and note_snippets in the same transaction (migration 0003);
+// the UI asks for confirmation first.
 export async function DELETE(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   if (!(await isAuthed())) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
