@@ -13,6 +13,8 @@ export interface SettingsData {
   completion_style: CelebrationStyle;
   /** Time study check-in interval in minutes; null = off (SPEC 8.11). */
   time_study_minutes: number | null;
+  /** Evening wind-down reminder target, free text like "21:30" (SPEC 8.12). */
+  wind_down_time: string;
 }
 
 export interface LinkData {
@@ -108,6 +110,7 @@ export const DEFAULT_SETTINGS: SettingsData = {
   display_name: "Boss",
   completion_style: "dramatic",
   time_study_minutes: null,
+  wind_down_time: "",
 };
 
 interface LinkRow {
@@ -172,7 +175,7 @@ export async function loadDashboardData(): Promise<DashboardData> {
 
   const [settingsRes, projectsRes, tasksRes, linksRes, snippetsRes, sitesRes, loopsRes, miscRes, sessionsRes, infractionsRes, timeStudiesRes] =
     await Promise.all([
-      client.from("settings").select("display_name, completion_style, time_study_minutes").eq("id", 1).limit(1),
+      client.from("settings").select("display_name, completion_style, time_study_minutes, wind_down_time").eq("id", 1).limit(1),
       client.from("projects").select("id, name, notes, position").order("position"),
       client
         .from("tasks")
@@ -223,6 +226,7 @@ export async function loadDashboardData(): Promise<DashboardData> {
         display_name: settingsRow.display_name,
         completion_style: settingsRow.completion_style as CelebrationStyle,
         time_study_minutes: settingsRow.time_study_minutes ?? null,
+        wind_down_time: settingsRow.wind_down_time ?? "",
       }
     : DEFAULT_SETTINGS;
 
