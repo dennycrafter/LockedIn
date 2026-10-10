@@ -224,7 +224,7 @@ export function OrganizeModal({
           disabled={planBusy || topItem === null || topItem.kind === "misc"}
           title={topItem?.kind === "misc" ? "Misc tasks cannot go in the plan." : undefined}
           className="rounded-md px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-          style={{ background: "var(--accent)" }}
+          style={{ background: "var(--accent-strong)" }}
         >
           Make #1 my most important task
         </button>

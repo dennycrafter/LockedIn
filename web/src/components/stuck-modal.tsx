@@ -32,7 +32,7 @@ const INPUT =
 
 function chipStyle(active: boolean): React.CSSProperties {
   return active
-    ? { borderColor: "var(--accent-ink)", color: "var(--accent-ink)" }
+    ? { borderColor: "var(--muted)", color: "var(--fg)" }
     : { borderColor: "var(--line)", color: "var(--fg)" };
 }
 
@@ -167,7 +167,7 @@ export function StuckModal({
           type="button"
           onClick={startFiveMinutes}
           className="rounded-md px-4 py-2 text-sm font-medium text-white"
-          style={{ background: "var(--accent)" }}
+          style={{ background: "var(--accent-strong)" }}
         >
           Start 5 minutes
         </button>

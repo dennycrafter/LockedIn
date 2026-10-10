@@ -151,7 +151,7 @@ export function ProfileMenu({
                     className="rounded-md border px-3 py-1.5 text-sm disabled:opacity-50"
                     style={
                       settings.helper_mode === option.value
-                        ? { borderColor: "var(--accent-ink)", color: "var(--accent-ink)" }
+                        ? { borderColor: "var(--muted)", color: "var(--fg)" }
                         : { borderColor: "var(--line)", color: "var(--fg)" }
                     }
                   >

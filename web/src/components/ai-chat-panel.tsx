@@ -186,7 +186,7 @@ export function AiChatPanel({
           type="submit"
           disabled={draft.trim() === "" || capped || busy}
           className={actionsNode ? SECONDARY_BUTTON : ACCENT_BUTTON}
-          style={actionsNode ? undefined : { background: "var(--accent)" }}
+          style={actionsNode ? undefined : { background: "var(--accent-strong)" }}
         >
           Send
         </button>
