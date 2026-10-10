@@ -26,6 +26,7 @@ import { StartSessionDialog } from "./start-session-dialog";
 import { StatsStrip } from "./stats-strip";
 import { TimeStudyPanel } from "./time-study-panel";
 import { TimeStudyPromptCard } from "./time-study-prompt";
+import { TomorrowPlanPanel } from "./tomorrow-plan-panel";
 
 type ConnectionState = "checking" | "connected" | "disconnected";
 
@@ -619,6 +620,14 @@ export function LockedInApp({ initialData }: { initialData: DashboardData }) {
         />
 
         <div className="flex flex-col gap-4">
+          <TomorrowPlanPanel
+            startDisabled={session !== null}
+            onToggleTask={panelHandlers.onToggleTask}
+            onStartTask={startOnTask}
+            onPlanCompleted={() =>
+              setCelebration((prev) => prev ?? { name: data.settings.display_name, style: data.settings.completion_style })
+            }
+          />
           <MiscTasksPanel
             miscTasks={data.miscTasks}
             startDisabled={session !== null}
