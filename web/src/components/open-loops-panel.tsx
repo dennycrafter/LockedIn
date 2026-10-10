@@ -99,7 +99,7 @@ export function OpenLoopsPanel({
       aria-label="Open loops and decisions"
       className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-4"
     >
-      <div className="flex items-center justify-between gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <button
           type="button"
           onClick={() => {
@@ -110,12 +110,12 @@ export function OpenLoopsPanel({
           className="flex items-center gap-2 text-base font-semibold text-[var(--fg)]"
         >
           <span aria-hidden className="text-[var(--muted)]">
-            {collapsed ? "+" : "-"}
+            {collapsed ? "▸" : "▾"}
           </span>
           Open loops
         </button>
-        <span className="rounded-full border border-[var(--line)] px-2 py-0.5 text-xs text-[var(--muted)]">
-          {totalSavedCount(loops)} saved ({loopCount(loops)} loops, {decisionCount(loops)} decisions)
+        <span className="text-xs text-[var(--muted)]">
+          {totalSavedCount(loops)} saved · {loopCount(loops)} loops · {decisionCount(loops)} decisions
         </span>
       </div>
 

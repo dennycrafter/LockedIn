@@ -60,7 +60,7 @@ export default function LoginPage() {
         <button
           type="submit"
           disabled={pending}
-          className="w-full rounded-md bg-[var(--accent)] px-3 py-2 font-medium text-white transition-colors hover:bg-[var(--accent-ink)] disabled:opacity-60"
+          className="w-full rounded-md bg-[var(--accent-strong)] px-3 py-2 font-medium text-white transition-colors hover:bg-[var(--accent-strong-hover)] disabled:opacity-60"
         >
           {pending ? "Checking..." : "Unlock"}
         </button>

@@ -57,16 +57,29 @@ export function timeByProject(sessions: SessionData[], projects: ProjectData[]):
     .sort((a, b) => b.minutes - a.minutes);
 }
 
-function Stat({ label, value, first }: { label: string; value: string; first: boolean }) {
+function Stat({ label, value, index }: { label: string; value: string; index: number }) {
+  const secondCol = index % 2 === 1;
+  const secondRow = index >= 2;
   return (
     <div
-      className="min-w-0 flex-1 px-4 py-3"
-      style={first ? undefined : { borderLeft: "1px solid var(--line)" }}
+      className="min-w-0 px-4 py-3"
+      style={{
+        ...(secondCol ? { borderLeft: "1px solid var(--line)" } : {}),
+        ...(secondRow ? { borderTop: "1px solid var(--line)" } : {}),
+      }}
     >
-      <div className="truncate text-xs uppercase tracking-wide text-[var(--muted)]">{label}</div>
+      <div className="text-xs uppercase leading-snug tracking-wide text-[var(--muted)]">{label}</div>
       <div
-        className="truncate text-2xl text-[var(--fg)]"
-        style={{ fontFamily: "var(--font-saira), inherit" }}
+        className="break-words leading-tight text-[var(--fg)]"
+        style={
+          value.length <= 8
+            ? {
+                // Big numbers get Saira at 2xl (SPEC 10: display font only for digits).
+                fontFamily: "var(--font-saira), ui-sans-serif, system-ui, sans-serif",
+                fontSize: "1.5rem",
+              }
+            : { fontSize: "1rem" }
+        }
       >
         {value}
       </div>
@@ -99,9 +112,9 @@ export function StatsStrip({
 
   return (
     <section aria-label="Today's stats">
-      <div className="flex rounded-lg border border-[var(--line)] bg-[var(--surface)]">
+      <div className="grid grid-cols-2 rounded-lg border border-[var(--line)] bg-[var(--surface)]">
         {stats.map((stat, index) => (
-          <Stat key={stat.label} label={stat.label} value={stat.value} first={index === 0} />
+          <Stat key={stat.label} label={stat.label} value={stat.value} index={index} />
         ))}
       </div>
 
@@ -112,15 +125,15 @@ export function StatsStrip({
         ) : (
           <ul className="mt-3 space-y-2">
             {byProject.map((row) => (
-              <li key={row.name} className="flex items-center gap-3 text-sm">
-                <span className="w-40 shrink-0 truncate text-[var(--fg)]">{row.name}</span>
-                <span className="h-2 flex-1 overflow-hidden rounded-sm bg-[var(--surface-2)]">
+              <li key={row.name} className="flex min-w-0 items-center gap-3 text-sm">
+                <span className="min-w-0 flex-1 truncate text-[var(--fg)]">{row.name}</span>
+                <span className="h-2 w-16 shrink-0 overflow-hidden rounded-sm bg-[var(--surface-2)]">
                   <span
-                    className="block h-full rounded-sm bg-[var(--accent)]"
+                    className="block h-full rounded-sm bg-[var(--muted)]"
                     style={{ width: `${Math.round((row.minutes / maxMinutes) * 100)}%` }}
                   />
                 </span>
-                <span className="w-16 shrink-0 text-right text-[var(--muted)]">
+                <span className="w-12 shrink-0 text-right text-[var(--muted)]">
                   {Math.round(row.minutes)}m
                 </span>
               </li>

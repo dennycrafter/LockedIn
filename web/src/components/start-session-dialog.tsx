@@ -136,7 +136,7 @@ export function StartSessionDialog({
                 className="rounded-md border px-3 py-1.5 text-sm"
                 style={
                   !customMinutes && minutes === choice
-                    ? { borderColor: "var(--accent-ink)", color: "var(--accent-ink)" }
+                    ? { borderColor: "var(--muted)", color: "var(--fg)" }
                     : { borderColor: "var(--line)", color: "var(--fg)" }
                 }
               >
@@ -168,7 +168,7 @@ export function StartSessionDialog({
                 className="rounded-md border px-3 py-1.5 text-sm capitalize"
                 style={
                   lockMode === choice
-                    ? { borderColor: "var(--accent-ink)", color: "var(--accent-ink)" }
+                    ? { borderColor: "var(--muted)", color: "var(--fg)" }
                     : { borderColor: "var(--line)", color: "var(--fg)" }
                 }
               >
@@ -186,7 +186,7 @@ export function StartSessionDialog({
           type="submit"
           disabled={!minutesValid}
           className="w-full rounded-md px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-          style={{ background: "var(--accent)" }}
+          style={{ background: "var(--accent-strong)" }}
         >
           Start session
         </button>

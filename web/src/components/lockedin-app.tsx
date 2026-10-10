@@ -627,7 +627,7 @@ export function LockedInApp({ initialData }: { initialData: DashboardData }) {
               }}
               disabled={connection === "disconnected"}
               className="rounded-md px-4 py-3 text-sm font-medium text-white disabled:opacity-50"
-              style={{ background: "var(--accent)" }}
+              style={{ background: "var(--accent-strong)" }}
             >
               {justEnded ? "Start another session" : "Start working"}
             </button>

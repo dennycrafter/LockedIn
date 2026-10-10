@@ -51,7 +51,7 @@ function MiscTaskRow({
         {...attributes}
         {...listeners}
         aria-label={`Drag to reorder misc task: ${task.title}`}
-        className="cursor-grab select-none touch-none px-1 text-[var(--muted)] hover:text-[var(--fg)]"
+        className="cursor-grab select-none touch-none inline-flex h-6 w-6 items-center justify-center text-[var(--muted)] hover:text-[var(--fg)]"
       >
         ⠿
       </button>

@@ -22,7 +22,7 @@ export function ProgressRing({ percent, label }: { percent: number; label: strin
           cy="10"
           r={radius}
           fill="none"
-          stroke="var(--ok)"
+          stroke="var(--muted)"
           strokeWidth="2"
           strokeDasharray={circumference}
           strokeDashoffset={offset}

@@ -51,9 +51,9 @@ export interface ProjectsPanelHandlers {
   onDeleteLink: (linkId: string) => void;
 }
 
-const HANDLE_CLASS = "cursor-grab select-none touch-none px-1 text-[var(--muted)] hover:text-[var(--fg)]";
+const HANDLE_CLASS = "cursor-grab select-none touch-none inline-flex h-6 w-6 items-center justify-center text-[var(--muted)] hover:text-[var(--fg)]";
 const ROW_CLASS = "flex items-center gap-2 px-3 py-2";
-const ICON_BUTTON = "shrink-0 px-1 text-xs text-[var(--muted)] hover:text-[var(--fg)]";
+const ICON_BUTTON = "inline-flex h-6 min-w-6 shrink-0 items-center justify-center gap-0.5 px-1 text-xs text-[var(--muted)] hover:text-[var(--fg)]";
 const COLLAPSED_KEY = "lockedin-collapsed-projects";
 
 function readCollapsedProjects(): string[] {
@@ -376,7 +376,7 @@ function ProjectBlock({
           onClick={onToggleCollapsed}
           aria-label={collapsed ? `Expand ${project.name}` : `Collapse ${project.name}`}
           aria-expanded={!collapsed}
-          className="text-[var(--muted)] hover:text-[var(--fg)]"
+          className="inline-flex h-6 w-6 items-center justify-center text-[var(--muted)] hover:text-[var(--fg)]"
         >
           {collapsed ? ">" : "v"}
         </button>

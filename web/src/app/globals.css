@@ -17,6 +17,19 @@
   --bad: #ff6f66;
   --info: #6ab8ff;
   --r: 8px;
+  /* Filled main-action background: #7c5cff with white text measures 4.34:1,
+     under the 4.5:1 bar WCAG and Lighthouse require, so filled buttons use
+     this darker step of the same hue. --accent stays for rings and focus. */
+  --accent-strong: #6e4df6;
+  --accent-strong-hover: #5f3ff0;
+}
+
+/* Display font for big numbers (SPEC 10). next/font exposes the Saira family
+   through --font-saira; system fallbacks are added because CSS-wide keywords
+   like `inherit` are invalid inside a font-family list and would drop the
+   whole declaration. */
+.font-saira {
+  font-family: var(--font-saira), ui-sans-serif, system-ui, sans-serif;
 }
 
 body {
