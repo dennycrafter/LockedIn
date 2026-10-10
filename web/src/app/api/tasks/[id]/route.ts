@@ -61,6 +61,9 @@ export async function DELETE(_request: NextRequest, { params }: { params: Promis
   if (!(await isAuthed())) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  // Deleting a task cascades to its subtasks and day_plan_tasks (schema) and
+  // the delete_owner_links_snippets trigger removes this task's and its
+  // subtasks' links and note_snippets in the same transaction (migration 0003).
   const { id } = await params;
   const client = createServiceClient();
   const { error } = await client.from("tasks").delete().eq("id", id);
