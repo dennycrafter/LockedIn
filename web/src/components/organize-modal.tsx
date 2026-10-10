@@ -9,8 +9,14 @@
 // "Start it now" hands the item to the dashboard's existing start dialog.
 // X (Escape, or clicking outside) cancels at any step and the next open
 // starts fresh. Ranking math lives in lib/organize; this file is presentation.
+// AI mode (SPEC 8.15, T8-UI) is an explicit opt-in from the dump step: a chat
+// panel over the same undone tasks (ids included, so the ranked JSON can be
+// mapped back), rendering from the parsed ranked list with the same
+// confirm-then-write actions and the same start dialog handoff.
 
 import { useMemo, useState } from "react";
+import type { AiContext } from "@/lib/ai/types";
+import { formatUndoneTaskContext } from "@/lib/ai-client";
 import type { MiscTaskData, ProjectData } from "@/lib/dashboard-data";
 import {
   DEFAULT_RATING,
@@ -20,6 +26,7 @@ import {
   type OrganizeItem,
   type OrganizeRating,
 } from "@/lib/organize";
+import { AiChatPanel, type ActionableAiEntry } from "./ai-chat-panel";
 import { Modal } from "./modal";
 
 const JSON_HEADERS = { "Content-Type": "application/json" };
@@ -77,6 +84,7 @@ export function OrganizeModal({
   onToast,
   onChanged,
   onStartItem,
+  initialMode,
 }: {
   projects: ProjectData[];
   miscTasks: MiscTaskData[];
@@ -86,8 +94,12 @@ export function OrganizeModal({
   onChanged: () => void;
   /** Opens the existing start dialog on this item (SPEC 8.14 step 4). */
   onStartItem: (item: OrganizeItem) => void;
+  /** SPEC 8.15: the configured helper mode decides how the modal opens; the
+   * in-modal switch still works within an open session. */
+  initialMode?: "scripted" | "ai";
 }) {
   const [open, setOpen] = useState(false);
+  const [mode, setMode] = useState<"scripted" | "ai">("scripted");
   const [step, setStep] = useState<"dump" | "rate" | "ranked">("dump");
   const [checkedIds, setCheckedIds] = useState<Set<string>>(new Set());
   const [ratings, setRatings] = useState<Record<string, OrganizeRating>>({});
@@ -99,6 +111,17 @@ export function OrganizeModal({
   const [planError, setPlanError] = useState<string | null>(null);
 
   const dump = useMemo(() => organizeDumpItems(projects, miscTasks), [projects, miscTasks]);
+
+  // Every undone item with its id, so the ranked reply can be mapped back to
+  // the item the confirm actions write against.
+  const aiContext = useMemo<AiContext>(
+    () => ({
+      undoneTasks: formatUndoneTaskContext(
+        dump.map((item) => ({ label: item.label, id: item.id, kind: item.kind })),
+      ),
+    }),
+    [dump],
+  );
   const treeItems = dump.filter((item) => item.kind !== "misc");
   const miscItems = dump.filter((item) => item.kind === "misc");
   const checkedItems = useMemo(() => dump.filter((item) => checkedIds.has(item.id)), [dump, checkedIds]);
@@ -110,6 +133,7 @@ export function OrganizeModal({
   const top = ranked[0] ?? null;
 
   const openFresh = () => {
+    setMode(initialMode ?? "scripted");
     setStep("dump");
     setCheckedIds(new Set());
     setRatings({});
@@ -155,15 +179,15 @@ export function OrganizeModal({
     }
   };
 
-  const makeMostImportant = async () => {
-    if (!top || top.item.kind === "misc" || planBusy) return;
+  const makeMostImportant = async (item: OrganizeItem) => {
+    if (item.kind === "misc" || planBusy) return;
     setPlanBusy(true);
     setPlanError(null);
     try {
       const response = await fetch("/api/day-plans/most-important", {
         method: "POST",
         headers: JSON_HEADERS,
-        body: JSON.stringify({ taskId: top.item.id }),
+        body: JSON.stringify({ taskId: item.id }),
       });
       const payload = (await response.json().catch(() => ({}))) as { error?: string };
       if (!response.ok) {
@@ -178,6 +202,49 @@ export function OrganizeModal({
     } finally {
       setPlanBusy(false);
     }
+  };
+
+  // Confirm-then-write: the AI ranked list only writes when the owner clicks,
+  // mapped back to a dump item by the id the context gave the AI. The same
+  // buttons and rules as the scripted ranked step (misc cannot be planned).
+  const renderAiActions = (entry: ActionableAiEntry) => {
+    if (entry.ranked.length === 0) return null;
+    const topRef = entry.ranked[0].taskId;
+    const topItem = topRef ? (dump.find((item) => item.id === topRef) ?? null) : null;
+    return (
+      <div className="mt-3 flex flex-col gap-2">
+        {topItem === null && (
+          <p className="text-xs text-[var(--muted)]">The AI suggested a task that is not in your list.</p>
+        )}
+        <button
+          type="button"
+          onClick={() => {
+            if (topItem) void makeMostImportant(topItem);
+          }}
+          disabled={planBusy || topItem === null || topItem.kind === "misc"}
+          title={topItem?.kind === "misc" ? "Misc tasks cannot go in the plan." : undefined}
+          className="rounded-md px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+          style={{ background: "var(--accent)" }}
+        >
+          Make #1 my most important task
+        </button>
+        {topItem?.kind === "misc" && (
+          <p className="text-xs text-[var(--muted)]">Misc tasks cannot go in the plan. Start a timer on them instead.</p>
+        )}
+        <button
+          type="button"
+          disabled={topItem === null}
+          onClick={() => {
+            if (!topItem) return;
+            onStartItem(topItem);
+            close();
+          }}
+          className="rounded-md border border-[var(--line)] px-4 py-2 text-sm text-[var(--fg)] hover:border-[var(--muted)] disabled:opacity-50"
+        >
+          Start it now
+        </button>
+      </div>
+    );
   };
 
   if (!open) {
@@ -213,7 +280,21 @@ export function OrganizeModal({
 
   return (
     <Modal title="Organize my task list" onClose={close}>
-      {safeStep === "dump" && (
+      {mode === "ai" && (
+        <div>
+          <p className="text-sm text-[var(--fg)]">AI organize mode</p>
+          <AiChatPanel
+            flow="organize"
+            context={aiContext}
+            introText="The AI can see your undone tasks. It will ask about deadlines, impact and effort, then return a ranked list."
+            sendLabel="Message the AI organizer"
+            renderActions={renderAiActions}
+            onSwitchToScripted={() => setMode("scripted")}
+          />
+        </div>
+      )}
+
+      {mode === "scripted" && safeStep === "dump" && (
         <div>
           <p className="text-sm text-[var(--fg)]">Dump everything you could work on.</p>
           <p className="mt-1 text-xs text-[var(--muted)]">Tick what you could work on. Anything missing? Add it below.</p>
@@ -312,10 +393,20 @@ export function OrganizeModal({
               Next
             </button>
           </div>
+
+          <div className="mt-3">
+            <button
+              type="button"
+              onClick={() => setMode("ai")}
+              className="text-sm text-[var(--muted)] hover:text-[var(--fg)]"
+            >
+              Let AI organize instead
+            </button>
+          </div>
         </div>
       )}
 
-      {safeStep === "rate" && ratingItem && (
+      {mode === "scripted" && safeStep === "rate" && ratingItem && (
         <div className="space-y-4">
           <div>
             <p className="text-xs text-[var(--muted)]">
@@ -381,7 +472,7 @@ export function OrganizeModal({
         </div>
       )}
 
-      {safeStep === "ranked" && (
+      {mode === "scripted" && safeStep === "ranked" && (
         <div>
           <p className="text-sm text-[var(--fg)]">Ranked. Start at the top.</p>
           <ol className="mt-2 max-h-64 overflow-y-auto rounded-md border border-[var(--line)]">
@@ -415,7 +506,7 @@ export function OrganizeModal({
           <div className="mt-4 flex flex-col gap-2">
             <button
               type="button"
-              onClick={() => void makeMostImportant()}
+              onClick={() => void makeMostImportant(top.item)}
               disabled={planBusy || top?.item.kind === "misc"}
               title={top?.item.kind === "misc" ? "Misc tasks cannot go in the plan." : undefined}
               className="rounded-md px-4 py-2 text-sm font-medium text-white disabled:opacity-50"

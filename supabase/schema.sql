@@ -8,7 +8,11 @@ create table settings (
   default_minutes int not null default 25,
   default_lock text not null default 'hard' check (default_lock in ('none','soft','hard')),
   -- optional evening reminder target for the wind down card, e.g. "21:30"
-  wind_down_time text not null default ''
+  wind_down_time text not null default '',
+  -- SPEC 8.15: which mode the helper flows open in. 'ai' still needs the
+  -- Anthropic key configured in Vercel; without it the settings toggle
+  -- refuses to switch (the key itself never reaches the browser).
+  helper_mode text not null default 'scripted' check (helper_mode in ('scripted','ai'))
 );
 insert into settings (id) values (1);
 

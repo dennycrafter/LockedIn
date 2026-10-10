@@ -7,7 +7,7 @@
 // settings, and the completion celebration (SPEC 8.2, 8.3, 8.10).
 import { useCallback, useEffect, useRef, useState } from "react";
 import { callExtension } from "@/lib/bridge-client";
-import type { CelebrationStyle, DashboardData, SettingsData } from "@/lib/dashboard-data";
+import type { CelebrationStyle, DashboardData, HelperMode, SettingsData } from "@/lib/dashboard-data";
 import type { ExtensionSession, LockMode } from "@/lib/extension-session";
 import { shouldCelebrate } from "@/lib/celebration";
 import { projectOfTask, projectProgress, withTaskDone } from "@/lib/tree";
@@ -59,6 +59,9 @@ export function LockedInApp({ initialData }: { initialData: DashboardData }) {
   const [toast, setToast] = useState<string | null>(null);
   const [sitesError, setSitesError] = useState<string | null>(null);
   const [settingsError, setSettingsError] = useState<string | null>(null);
+  // SPEC 8.15: whether the Anthropic key is configured, from the server's
+  // computed GET /api/settings flag (the browser cannot read env vars).
+  const [aiAvailable, setAiAvailable] = useState(false);
   const [linksError, setLinksError] = useState<string | null>(null);
   const [celebration, setCelebration] = useState<{ name: string; style: CelebrationStyle } | null>(null);
   // Pending time study check-in surfaced by getState (SPEC 8.11); null = none.
@@ -485,8 +488,32 @@ export function LockedInApp({ initialData }: { initialData: DashboardData }) {
     [apiCall],
   );
 
+  // SPEC 8.15: the settings toggle needs the server's computed key-presence
+  // flag; fetched once on mount because the browser cannot read env vars.
+  // On failure the toggle stays in its safe scripted-only state until reload.
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/settings")
+      .then((response) => (response.ok ? response.json() : null))
+      .then((payload: { aiAvailable?: boolean } | null) => {
+        if (!cancelled && payload?.aiAvailable) setAiAvailable(true);
+      })
+      .catch(() => {
+        // Degrade to scripted-only; no dashboard surface reports a settings
+        // fetch failure and the AI opt-ins inside the modals still work.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const saveSettings = useCallback(
-    async (next: { display_name?: string; completion_style?: CelebrationStyle; time_study_minutes?: number | null }) => {
+    async (next: {
+      display_name?: string;
+      completion_style?: CelebrationStyle;
+      helper_mode?: HelperMode;
+      time_study_minutes?: number | null;
+    }) => {
       setSettingsError(null);
       try {
         const response = await fetch("/api/settings", {
@@ -567,7 +594,7 @@ export function LockedInApp({ initialData }: { initialData: DashboardData }) {
           <span aria-hidden className="inline-block h-2 w-2 rounded-full" style={{ background: dot.background }} />
           {dot.text}
         </span>
-        <ProfileMenu settings={data.settings} error={settingsError} onSave={saveSettings} />
+        <ProfileMenu settings={data.settings} aiAvailable={aiAvailable} error={settingsError} onSave={saveSettings} />
       </header>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,7fr)_minmax(0,12fr)_minmax(0,5fr)]">
@@ -671,6 +698,7 @@ export function LockedInApp({ initialData }: { initialData: DashboardData }) {
           <OrganizeModal
             projects={data.projects}
             miscTasks={data.miscTasks}
+            initialMode={data.settings.helper_mode}
             onToast={showToast}
             onChanged={() => void refetchData()}
             onStartItem={(item) => {
@@ -682,6 +710,7 @@ export function LockedInApp({ initialData }: { initialData: DashboardData }) {
           />
           <StuckModal
             projects={data.projects}
+            initialMode={data.settings.helper_mode}
             onToast={showToast}
             onChanged={() => void refetchData()}
             onStartTask={(taskId) => {
