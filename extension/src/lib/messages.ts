@@ -12,6 +12,13 @@ export type BridgeMethod =
   | "setTree"
   | "startSession"
   | "getState"
+  | "pause"
+  | "resume"
+  | "addTime"
+  | "requestEnd"
+  | "cancelEnd"
+  | "setFloat"
+  | "addManualInfraction"
   | "drainQueue"
   | "ackQueue"
   | "setTimeStudy"
@@ -29,11 +36,14 @@ export interface StartSessionPayload {
 
 export interface StatePayload {
   session: import("./session").ActiveSession | null;
+  /** Deadline of the soft lock's 2 minute end countdown, epoch ms. */
   softUnlockAt: number | null;
   /** Check-in interval, null = off (SPEC 8.11). */
   timeStudyMinutes: number | null;
   /** Unanswered check-in; the dashboard shows the prompt for it. */
   timeStudyPrompt: import("./storage").TimeStudyPrompt | null;
+  /** Global "Float timer" toggle (SPEC 8.6). */
+  floatEnabled: boolean;
 }
 
 export interface DrainPayload {

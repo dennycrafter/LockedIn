@@ -3,8 +3,11 @@
 // Active session panel (SPEC 8.4 left column): big timer, lock pill, pause,
 // +-5, End, manual infraction input. The extension owns the state; this panel
 // mirrors it through getState and sends control messages over the bridge.
+// A soft lock's early end shows the 2 minute unlock countdown with "Keep
+// working" to cancel it; a hard lock disables End with the end time in it.
 import type { ExtensionSession } from "@/lib/extension-session";
 import { formatCountdown, sessionRemainingMs } from "@/lib/extension-session";
+import { sessionPhase } from "@/lib/session-phase";
 
 function lockPillStyle(lockMode: ExtensionSession["lockMode"]): { background: string; color: string } {
   if (lockMode === "hard") return { background: "color-mix(in srgb, var(--bad) 18%, transparent)", color: "var(--bad)" };
@@ -15,17 +18,28 @@ function lockPillStyle(lockMode: ExtensionSession["lockMode"]): { background: st
 export function SessionPanel({
   session,
   nowMs,
+  softUnlockAtMs,
+  floatEnabled,
+  onToggleFloat,
   onControl,
   onManualInfraction,
 }: {
   session: ExtensionSession;
   nowMs: number;
+  softUnlockAtMs: number | null;
+  floatEnabled: boolean;
+  onToggleFloat: (enabled: boolean) => void;
   onControl: (method: "pause" | "resume" | "addTime" | "requestEnd" | "cancelEnd", payload?: unknown) => void;
   onManualInfraction: (text: string) => void;
 }) {
+  const phase = sessionPhase(session, softUnlockAtMs);
   const remaining = formatCountdown(sessionRemainingMs(session, nowMs));
-  const paused = session.pausedAtMs !== null;
+  const paused = phase === "paused";
+  const ending = phase === "ending";
   const hardLocked = session.lockMode === "hard";
+  // While ending, the number that matters is when the sites unlock again.
+  const unlockRemaining =
+    ending && softUnlockAtMs !== null ? formatCountdown(Math.max(0, softUnlockAtMs - nowMs)) : null;
   const pill = lockPillStyle(session.lockMode);
 
   return (
@@ -41,11 +55,12 @@ export function SessionPanel({
         className="mt-2 text-6xl tracking-tight text-[var(--fg)]"
         style={{ fontFamily: "var(--font-saira), inherit" }}
         role="timer"
-        aria-label={`Time remaining ${remaining}`}
+        aria-label={ending ? `Sites unlock in ${unlockRemaining}` : `Time remaining ${remaining}`}
       >
-        {remaining}
+        {ending ? unlockRemaining : remaining}
       </div>
-      {paused && <p className="mt-1 text-sm text-[var(--warn)]">Paused. Blocking stays on.</p>}
+      {paused && !ending && <p className="mt-1 text-sm text-[var(--warn)]">Paused. Blocking stays on.</p>}
+      {ending && <p className="mt-1 text-sm text-[var(--warn)]">Ending early. Sites stay blocked until this finishes.</p>}
 
       <div className="mt-4 flex flex-wrap items-center gap-2">
         <button
@@ -71,7 +86,17 @@ export function SessionPanel({
         >
           -5
         </button>
-        {hardLocked ? (
+        {ending ? (
+          <button
+            type="button"
+            onClick={() => onControl("cancelEnd")}
+            aria-label="Keep working, cancel the end countdown"
+            title="Cancel the countdown and keep the session running"
+            className="rounded-md border border-[var(--line)] px-3 py-1.5 text-sm text-[var(--fg)] hover:border-[var(--muted)]"
+          >
+            Keep working
+          </button>
+        ) : hardLocked ? (
           <button
             type="button"
             disabled
@@ -92,6 +117,17 @@ export function SessionPanel({
           </button>
         )}
       </div>
+
+      <label className="mt-3 flex items-center gap-2 text-sm text-[var(--muted)]">
+        <input
+          type="checkbox"
+          checked={floatEnabled}
+          onChange={(event) => onToggleFloat(event.target.checked)}
+          aria-label="Show the floating timer on other sites"
+          className="h-4 w-4 accent-[var(--accent)]"
+        />
+        Float timer
+      </label>
 
       <form
         className="mt-4 flex gap-2"

@@ -2,9 +2,12 @@
 
 // Start session dialog (SPEC 8.4): pick project > task (both optional), a
 // duration, and a lock mode. "Start session" is the one accent action here.
-import { useMemo, useState } from "react";
+// Remembers the last duration and lock mode per device, and can arrive with a
+// pre-selected project/task when opened from a row timer button.
+import { useEffect, useMemo, useState } from "react";
 import type { ProjectData } from "@/lib/dashboard-data";
 import type { LockMode } from "@/lib/extension-session";
+import { loadTimerPrefs, saveTimerPrefs } from "@/lib/timer-prefs";
 import { Modal } from "./modal";
 
 const DURATION_CHOICES = [15, 25, 45, 60, 90];
@@ -12,11 +15,15 @@ const LOCK_CHOICES: LockMode[] = ["none", "soft", "hard"];
 
 export function StartSessionDialog({
   projects,
+  initialProjectId = null,
+  initialTaskId = null,
   miscTask,
   onClose,
   onStart,
 }: {
   projects: ProjectData[];
+  initialProjectId?: string | null;
+  initialTaskId?: string | null;
   /** Set when the timer was started from a misc task row (SPEC 8.9). */
   miscTask?: { id: string; title: string } | null;
   onClose: () => void;
@@ -28,11 +35,22 @@ export function StartSessionDialog({
     lockMode: LockMode;
   }) => void;
 }) {
-  const [projectId, setProjectId] = useState<string>("");
-  const [taskId, setTaskId] = useState<string>("");
-  const [minutes, setMinutes] = useState<number>(25);
+  const prefs = useMemo(loadTimerPrefs, []);
+  const [projectId, setProjectId] = useState<string>(initialProjectId ?? "");
+  const [taskId, setTaskId] = useState<string>(initialTaskId ?? "");
+  const [minutes, setMinutes] = useState<number>(prefs.minutes ?? 25);
   const [customMinutes, setCustomMinutes] = useState<string>("");
-  const [lockMode, setLockMode] = useState<LockMode>("hard");
+  const [lockMode, setLockMode] = useState<LockMode>(prefs.lockMode ?? "hard");
+
+  // A pre-selected task whose project is not in the tree (deleted mid-open)
+  // would leave the selects disagreeing; clear the task in that case.
+  useEffect(() => {
+    if (initialTaskId && !projects.some((project) => project.id === initialProjectId)) {
+      setTaskId("");
+    }
+    // Runs once on open; the dialog is unmounted on close.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const tasks = useMemo(() => {
     const project = projects.find((p) => p.id === projectId);
@@ -49,6 +67,7 @@ export function StartSessionDialog({
         onSubmit={(event) => {
           event.preventDefault();
           if (!minutesValid) return;
+          saveTimerPrefs({ minutes: resolvedMinutes, lockMode });
           onStart({
             projectId: miscTask ? null : projectId || null,
             taskId: miscTask ? null : taskId || null,

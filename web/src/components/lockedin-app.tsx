@@ -40,12 +40,20 @@ function connectionDot(state: ConnectionState): { background: string; text: stri
 export function LockedInApp({ initialData }: { initialData: DashboardData }) {
   const [data, setData] = useState<DashboardData>(initialData);
   const [session, setSession] = useState<ExtensionSession | null>(null);
+  const [softUnlockAt, setSoftUnlockAt] = useState<number | null>(null);
   const [connection, setConnection] = useState<ConnectionState>("checking");
   const [nowMs, setNowMs] = useState<number>(() => Date.now());
   const [startOpen, setStartOpen] = useState(false);
   // Misc task row timers open the same dialog with the misc task pre-targeted
   // (SPEC 8.9); null means the dialog was opened from "Start working".
   const [startMiscTask, setStartMiscTask] = useState<{ id: string; title: string } | null>(null);
+  // Row timer buttons pre-select project/task in the start dialog.
+  const [startWith, setStartWith] = useState<{ projectId: string | null; taskId: string | null } | null>(null);
+  // True right after a session ends, so the main button reads "Start another
+  // session" (SPEC 8.4) until a new one starts.
+  const [justEnded, setJustEnded] = useState(false);
+  // Global "Float timer" toggle (SPEC 8.6), mirrored from the extension.
+  const [floatEnabled, setFloatEnabled] = useState(true);
   const [toast, setToast] = useState<string | null>(null);
   const [sitesError, setSitesError] = useState<string | null>(null);
   const [settingsError, setSettingsError] = useState<string | null>(null);
@@ -56,6 +64,7 @@ export function LockedInApp({ initialData }: { initialData: DashboardData }) {
   const [timeStudySaving, setTimeStudySaving] = useState(false);
   const [timeStudyError, setTimeStudyError] = useState<string | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastSessionRef = useRef<ExtensionSession | null>(null);
 
   const showToast = useCallback((message: string) => {
     setToast(message);
@@ -106,9 +115,16 @@ export function LockedInApp({ initialData }: { initialData: DashboardData }) {
       if (document.visibilityState !== "visible") return;
       const reply = await callExtension("getState");
       if (reply.ok) {
-        const state = (reply.data ?? {}) as { session?: ExtensionSession | null; timeStudyPrompt?: { id: string } | null };
+        const state = (reply.data ?? {}) as {
+          session?: ExtensionSession | null;
+          softUnlockAt?: number | null;
+          timeStudyPrompt?: { id: string } | null;
+          floatEnabled?: boolean;
+        };
         setSession(state.session ?? null);
+        setSoftUnlockAt(state.softUnlockAt ?? null);
         setTimeStudyPrompt(state.timeStudyPrompt ?? null);
+        if (typeof state.floatEnabled === "boolean") setFloatEnabled(state.floatEnabled);
       }
       setNowMs(Date.now());
     };
@@ -116,6 +132,18 @@ export function LockedInApp({ initialData }: { initialData: DashboardData }) {
     const timer = setInterval(poll, 1000);
     return () => clearInterval(timer);
   }, []);
+
+  // Detect a session that just ended (poll went from a session to null) so
+  // the main button offers "Start another session" (SPEC 8.4).
+  useEffect(() => {
+    const previous = lastSessionRef.current;
+    lastSessionRef.current = session;
+    if (session) {
+      setJustEnded(false);
+      return;
+    }
+    if (previous) setJustEnded(true);
+  }, [session]);
 
   // Sync cycle on load and every 30s; refetch stats when something was saved.
   useEffect(() => {
@@ -196,15 +224,47 @@ export function LockedInApp({ initialData }: { initialData: DashboardData }) {
     [data.blockedSites, data.miscTasks, data.projects, pushBlockedSites, showToast],
   );
 
-  // Row timer buttons open the same start dialog; pre-selecting the task lands
-  // with the full timer-icon work in T3.
-  const startOnTask = useCallback(() => {
+  // Row timer buttons (SPEC 8.4): open the start dialog with the project and
+  // task (or subtask's parent) pre-selected.
+  const startOnTask = useCallback(
+    (taskId: string) => {
+      for (const project of data.projects) {
+        for (const task of project.tasks) {
+          if (task.id === taskId) {
+            setStartWith({ projectId: project.id, taskId });
+            setStartOpen(true);
+            return;
+          }
+          if (task.subtasks.some((sub) => sub.id === taskId)) {
+            setStartWith({ projectId: project.id, taskId });
+            setStartOpen(true);
+            return;
+          }
+        }
+      }
+      setStartOpen(true);
+    },
+    [data.projects],
+  );
+
+  const startOnProject = useCallback((projectId: string) => {
+    setStartWith({ projectId, taskId: null });
     setStartOpen(true);
   }, []);
 
   const controlSession = useCallback(
     async (method: "pause" | "resume" | "addTime" | "requestEnd" | "cancelEnd", payload?: unknown) => {
       const reply = await callExtension(method, payload);
+      if (!reply.ok) showToast(reply.error);
+    },
+    [showToast],
+  );
+
+  // Global "Float timer" toggle (SPEC 8.6): optimistic, reconciled by the poll.
+  const toggleFloat = useCallback(
+    async (enabled: boolean) => {
+      setFloatEnabled(enabled);
+      const reply = await callExtension("setFloat", { enabled });
       if (!reply.ok) showToast(reply.error);
     },
     [showToast],
@@ -335,6 +395,7 @@ export function LockedInApp({ initialData }: { initialData: DashboardData }) {
       });
     },
     onStartTask: startOnTask,
+    onStartProject: startOnProject,
     // Returns true on success so the links modal closes (design rule: add
     // actions close on success with a toast, stay open on error).
     onAddLink: async (ownerType, ownerId, name, url) => {
@@ -517,11 +578,21 @@ export function LockedInApp({ initialData }: { initialData: DashboardData }) {
             nowMs={nowMs}
           />
           {session ? (
-            <SessionPanel session={session} nowMs={nowMs} onControl={controlSession} onManualInfraction={addManualInfraction} />
+            <SessionPanel
+              session={session}
+              nowMs={nowMs}
+              softUnlockAtMs={softUnlockAt}
+              floatEnabled={floatEnabled}
+              onToggleFloat={toggleFloat}
+              onControl={controlSession}
+              onManualInfraction={addManualInfraction}
+            />
           ) : (
             <button
               type="button"
               onClick={() => {
+                setJustEnded(false);
+                setStartWith(null);
                 setStartMiscTask(null);
                 setStartOpen(true);
               }}
@@ -529,7 +600,7 @@ export function LockedInApp({ initialData }: { initialData: DashboardData }) {
               className="rounded-md px-4 py-3 text-sm font-medium text-white disabled:opacity-50"
               style={{ background: "var(--accent)" }}
             >
-              Start working
+              {justEnded ? "Start another session" : "Start working"}
             </button>
           )}
           {connection === "disconnected" && (
@@ -540,7 +611,12 @@ export function LockedInApp({ initialData }: { initialData: DashboardData }) {
           )}
         </div>
 
-        <ProjectsPanel projects={data.projects} handlers={panelHandlers} addLinkError={linksError} />
+        <ProjectsPanel
+          projects={data.projects}
+          handlers={panelHandlers}
+          addLinkError={linksError}
+          sessionActive={session !== null}
+        />
 
         <div className="flex flex-col gap-4">
           <MiscTasksPanel
@@ -601,7 +677,13 @@ export function LockedInApp({ initialData }: { initialData: DashboardData }) {
         <StartSessionDialog
           projects={data.projects}
           miscTask={startMiscTask}
-          onClose={() => setStartOpen(false)}
+          initialProjectId={startWith?.projectId ?? null}
+          initialTaskId={startWith?.taskId ?? null}
+          onClose={() => {
+            setStartOpen(false);
+            setStartWith(null);
+            setStartMiscTask(null);
+          }}
           onStart={(spec) => void startSession(spec)}
         />
       )}

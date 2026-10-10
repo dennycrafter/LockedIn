@@ -15,6 +15,7 @@
   },
   "permissions": [
     "storage",
+    "notifications",
     "alarms",
     "contextMenus",
     "notifications",

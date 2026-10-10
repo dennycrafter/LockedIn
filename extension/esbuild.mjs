@@ -30,5 +30,6 @@ if (process.argv.includes("--watch")) {
   cpSync("src/blocked.html", "dist/blocked.html");
   cpSync("src/capture.html", "dist/capture.html");
   cpSync("src/icons", "dist/icons", { recursive: true });
+  cpSync("src/assets", "dist/assets", { recursive: true });
   console.log("Extension built to dist/");
 }
