@@ -6,15 +6,19 @@
 // already tried). Step 2 shows the deterministic suggestion from lib/stuck
 // and acts through existing routes only: the start dialog handoff (the same
 // pattern organize-modal uses for "Start it now"), the subtask quick-add via
-// POST /api/tasks, or the open loop via POST /api/open-loops. No /api/ai call
-// lives here. The T8-UI AI mode can be added without rework: the check-in
-// state is serializable and this modal renders whatever StuckSuggestion it is
-// given, so an AI producer slots in beside suggestStuckHelp.
-// X, Escape and outside click cancel at any step; a fresh open starts over.
+// POST /api/tasks, or the open loop via POST /api/open-loops.
+// AI mode (SPEC 8.15, T8-UI) is an explicit opt-in from the check-in step:
+// the same task picker stays above an AI chat panel, the scripted answers
+// are kept while the chat runs, and a START_5_MIN reply offers the 5 minute
+// session through the same start dialog handoff. X, Escape and outside click
+// cancel at any step; a fresh open starts over in scripted mode.
 
 import { useMemo, useState } from "react";
+import type { AiContext } from "@/lib/ai/types";
+import { formatUndoneTaskContext } from "@/lib/ai-client";
 import type { ProjectData } from "@/lib/dashboard-data";
-import { openLoopText, stuckTaskOptions, suggestStuckHelp, TRIED_LABELS, type TriedLevel } from "@/lib/stuck";
+import { openLoopText, stuckTaskOptions, suggestStuckHelp, TRIED_LABELS, type StuckTaskOption, type TriedLevel } from "@/lib/stuck";
+import { AiChatPanel, type ActionableAiEntry } from "./ai-chat-panel";
 import { Modal } from "./modal";
 
 const JSON_HEADERS = { "Content-Type": "application/json" };
@@ -44,6 +48,38 @@ function SecondaryStartButton({ onClick }: { onClick: () => void }) {
   );
 }
 
+/** Task picker shared by the scripted check-in and AI mode (same handoff). */
+function PickerBlock({
+  options,
+  value,
+  onChange,
+}: {
+  options: StuckTaskOption[];
+  value: string;
+  onChange: (id: string) => void;
+}) {
+  return (
+    <div className="mt-3">
+      <select
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        aria-label="Which task are you stuck on?"
+        className="w-full rounded-md border border-[var(--line)] bg-[var(--bg)] px-3 py-1.5 text-sm text-[var(--fg)]"
+      >
+        <option value="">No specific task</option>
+        {options.map((option) => (
+          <option key={option.id} value={option.id}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+      {options.length === 0 && (
+        <p className="mt-1 text-xs text-[var(--muted)]">No undone tasks yet. You can run this without one.</p>
+      )}
+    </div>
+  );
+}
+
 export function StuckModal({
   projects,
   onToast,
@@ -59,6 +95,7 @@ export function StuckModal({
   onStartTask: (taskId: string | null) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [mode, setMode] = useState<"scripted" | "ai">("scripted");
   const [step, setStep] = useState<"checkin" | "suggestion">("checkin");
   const [selectedId, setSelectedId] = useState("");
   const [workedOn, setWorkedOn] = useState("");
@@ -74,12 +111,24 @@ export function StuckModal({
   const options = useMemo(() => stuckTaskOptions(projects), [projects]);
   const selected = options.find((option) => option.id === selectedId) ?? null;
 
+  // Undone tasks with their ids, so the AI can reference them and the
+  // START_5_MIN handoff can pre-target the start dialog.
+  const aiContext = useMemo<AiContext>(
+    () => ({
+      undoneTasks: formatUndoneTaskContext(
+        options.map((option) => ({ label: option.label, id: option.id, kind: option.kind })),
+      ),
+    }),
+    [options],
+  );
+
   const suggestion = useMemo(
     () => suggestStuckHelp({ workedOn, stuckWhere, tried }),
     [workedOn, stuckWhere, tried],
   );
 
   const openFresh = () => {
+    setMode("scripted");
     setStep("checkin");
     setSelectedId("");
     setWorkedOn("");
@@ -104,6 +153,27 @@ export function StuckModal({
     onStartTask(selected ? selected.topTaskId : null);
     close();
   };
+
+  // The START_5_MIN marker becomes the same 5 minute handoff the scripted
+  // suggestion uses; with no picker pick, the dialog opens clean.
+  const renderAiActions = (entry: ActionableAiEntry) =>
+    entry.start5min ? (
+      <div className="mt-3 flex flex-col gap-2">
+        <button
+          type="button"
+          onClick={startFiveMinutes}
+          className="rounded-md px-4 py-2 text-sm font-medium text-white"
+          style={{ background: "var(--accent)" }}
+        >
+          Start 5 minutes
+        </button>
+        <p className="text-xs text-[var(--muted)]">
+          {selected
+            ? `Opens the session dialog with "${selected.title}" picked.`
+            : "Opens the session dialog so you can pick a task there."}
+        </p>
+      </div>
+    ) : null;
 
   const addSubtask = async () => {
     const title = subtaskTitle.trim();
@@ -175,28 +245,26 @@ export function StuckModal({
 
   return (
     <Modal title="I'm stuck, help me start" onClose={close}>
-      {step === "checkin" && (
+      {mode === "ai" && (
+        <div>
+          <p className="text-sm text-[var(--fg)]">AI coach mode</p>
+          <PickerBlock options={options} value={selectedId} onChange={setSelectedId} />
+          <AiChatPanel
+            flow="stuck"
+            context={aiContext}
+            introText="Tell the coach what is going on. It will help you name one tiny first step, then offer a 5 minute session."
+            sendLabel="Message the AI coach"
+            renderActions={renderAiActions}
+            onSwitchToScripted={() => setMode("scripted")}
+          />
+        </div>
+      )}
+
+      {mode === "scripted" && step === "checkin" && (
         <div>
           <p className="text-sm text-[var(--fg)]">First, a quick check-in.</p>
 
-          <div className="mt-3">
-            <select
-              value={selectedId}
-              onChange={(event) => setSelectedId(event.target.value)}
-              aria-label="Which task are you stuck on?"
-              className="w-full rounded-md border border-[var(--line)] bg-[var(--bg)] px-3 py-1.5 text-sm text-[var(--fg)]"
-            >
-              <option value="">No specific task</option>
-              {options.map((option) => (
-                <option key={option.id} value={option.id}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-            {options.length === 0 && (
-              <p className="mt-1 text-xs text-[var(--muted)]">No undone tasks yet. You can run this without one.</p>
-            )}
-          </div>
+          <PickerBlock options={options} value={selectedId} onChange={setSelectedId} />
 
           <div className="mt-3 space-y-3">
             <input
@@ -245,10 +313,20 @@ export function StuckModal({
               Next
             </button>
           </div>
+
+          <div className="mt-3">
+            <button
+              type="button"
+              onClick={() => setMode("ai")}
+              className="text-sm text-[var(--muted)] hover:text-[var(--fg)]"
+            >
+              Ask AI to coach me instead
+            </button>
+          </div>
         </div>
       )}
 
-      {step === "suggestion" && (
+      {mode === "scripted" && step === "suggestion" && (
         <div>
           {selected && <p className="text-xs text-[var(--muted)]">Stuck on: {selected.label}</p>}
           <p className="mt-1 text-sm font-medium text-[var(--fg)]">{suggestion.headline}</p>
