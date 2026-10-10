@@ -92,6 +92,7 @@ export function TomorrowPlanPanel({
   if (!plan) return null;
 
   const rows = visiblePlanRows(plan.rows);
+  const hiddenDone = plan.rows.length - rows.length;
   const meta = planMetaLine(plan, new Date());
 
   return (
@@ -137,6 +138,7 @@ export function TomorrowPlanPanel({
           ))}
         </ul>
       )}
+      {hiddenDone > 0 && <p className="mt-2 text-xs text-[var(--muted)]">{hiddenDone} hidden done</p>}
     </section>
   );
 }
