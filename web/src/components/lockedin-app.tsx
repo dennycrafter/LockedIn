@@ -619,7 +619,7 @@ export function LockedInApp({ initialData }: { initialData: DashboardData }) {
           className="absolute inset-0 -z-10 bg-[color-mix(in_srgb,var(--bg)_82%,transparent)] backdrop-blur"
         />
         <span className="flex items-center gap-2 text-lg font-semibold text-[var(--fg)]">
-          {/* Brand mark: the orange "in" tile, same file as the favicon. */}
+          {/* Brand mark: the pink eyes icon, same file as the favicon. */}
           <Image src="/icon.png" alt="" width={30} height={30} priority className="h-7 w-7 sm:h-[30px] sm:w-[30px]" />
           LockedIn
         </span>

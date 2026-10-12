@@ -543,13 +543,13 @@ Acceptance:
   color-scheme: dark;
   --bg: #0a0a0a; --surface: #131313; --surface-2: #1c1c1c; --line: #2b2b2b;
   --fg: #f4f4f4; --muted: #9b9b9b; --silver: #e8e8e8;
-  --accent: #fe9801; --accent-ink: #ffad33; /* logo orange */
-  --accent-strong: #fe9801; --accent-strong-hover: #ffad33; --on-accent: #000000;
-  --ok: #34d65c; --warn: #f2d24b; --bad: #ff6f66; --info: #6ab8ff;
+  --accent: #ff5c8a; --accent-ink: #ff85a8; /* logo pink */
+  --accent-strong: #ff5c8a; --accent-strong-hover: #ff85a8; --on-accent: #000000;
+  --ok: #34d65c; --warn: #f2d24b; --bad: #ff453a; --info: #6ab8ff;
   --r: 8px;
 }
 ```
-- Brand colours come from the logo: black and orange (#fe9801). Filled orange buttons use black text, like the logo's "in" tile. Warnings stay yellow so they never read as the brand orange.
+- Brand colours come from the eyes logo: black and pink (#ff5c8a). Filled pink buttons use black text, like the logo's eyes. Warnings are yellow and errors a true red (#ff453a) so neither reads as the brand pink.
 - Corners: boxes 8px, buttons and inputs 6px. Pills only for status (lock mode, extension connected).
 - Four greys only (bg, surface, surface-2, line). Inputs sit on `--bg`.
 - Accent colour only on the ONE main action per screen ("Start working" on the dashboard, "Start session" in the start dialog, "Next" in step flows, "Send" in EOD).

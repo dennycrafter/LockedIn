@@ -1,18 +1,20 @@
 <!doctype html><html><head><meta charset="utf-8"><style>
+/* Source for docs/brand/poster.png (1280x640). Edit, then screenshot at 1280x640. */
 *{margin:0;padding:0;box-sizing:border-box}
-body{width:1280px;height:640px;background:#fff;font-family:'Inter',sans-serif;color:#111;position:relative;overflow:hidden}
+body{width:1280px;height:640px;background:#fff;font-family:'Inter',sans-serif;color:#0b0b0b;position:relative;overflow:hidden}
 .top{position:absolute;top:64px;left:0;right:0;text-align:center;font-size:15px;font-weight:600;letter-spacing:.22em;color:#8a8a8a}
-.logo{position:absolute;top:178px;left:50%;transform:translateX(-50%);width:560px}
+.logo{position:absolute;top:168px;left:0;right:0;display:flex;justify-content:center;align-items:center;gap:30px}
+.logo img{width:128px;height:128px;image-rendering:pixelated}
+.logo span{font-family:'Inter Display','Inter';font-weight:900;font-size:112px;letter-spacing:-.035em;line-height:1}
 .tag{position:absolute;top:382px;left:0;right:0;text-align:center;font-family:'Inter Display','Inter';font-weight:800;font-size:40px;letter-spacing:-.01em}
-.tag span{color:#FE9801}
 .row{position:absolute;top:480px;left:0;right:0;display:flex;justify-content:center;gap:14px}
 .pill{display:flex;align-items:center;gap:10px;padding:12px 20px;border:1.5px solid #e6e6e6;border-radius:999px;font-size:18px;font-weight:600;color:#333}
-.dot{width:10px;height:10px;border-radius:3px;background:#FE9801}
-.bar{position:absolute;bottom:0;left:0;right:0;height:10px;background:#FE9801}
+.dot{width:10px;height:10px;border-radius:3px;background:#ff5c8a}
+.bar{position:absolute;bottom:0;left:0;right:0;height:10px;background:#ff5c8a}
 </style></head><body>
 <div class="top">FOCUS DASHBOARD + CHROME EXTENSION</div>
-<img class="logo" src="logo_trim.png">
-<div class="tag">Pick a task. Start the timer. <span>Get locked in.</span></div>
+<div class="logo"><img src="icon-1024.png" alt=""><span>LockedIn</span></div>
+<div class="tag">Pick a task. Start the timer. Get locked in.</div>
 <div class="row">
  <div class="pill"><i class="dot"></i>25 minute hard lock sessions</div>
  <div class="pill"><i class="dot"></i>Distracting sites blocked</div>

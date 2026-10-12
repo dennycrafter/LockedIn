@@ -95,7 +95,7 @@ export const STYLE = `
 `;
 
 function lockPill(lockMode: ActiveSession["lockMode"]): { background: string; color: string } {
-  if (lockMode === "hard") return { background: "rgba(255,111,102,.18)", color: "#ff6f66" };
+  if (lockMode === "hard") return { background: "rgba(255,69,58,.18)", color: "#ff453a" };
   if (lockMode === "soft") return { background: "rgba(242,210,75,.18)", color: "#f2d24b" };
   return { background: "rgba(106,184,255,.18)", color: "#6ab8ff" };
 }

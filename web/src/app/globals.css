@@ -3,7 +3,7 @@
 /* Design tokens per SPEC section 10 (dark only). */
 :root {
   color-scheme: dark;
-  /* Brand palette from the logo: pure black, neutral greys, one orange.
+  /* Brand palette from the eyes logo: black, neutral greys, one pink.
      Greys are neutral (no blue tint) so they sit with the logo's black. */
   --bg: #0a0a0a;
   --surface: #131313;
@@ -12,18 +12,18 @@
   --fg: #f4f4f4;
   --muted: #9b9b9b;
   --silver: #e8e8e8;
-  --accent: #fe9801;
-  --accent-ink: #ffad33;
+  --accent: #ff5c8a;
+  --accent-ink: #ff85a8;
   --ok: #34d65c;
-  /* Warning moved to yellow so it never reads as the brand orange. */
+  /* Warning is yellow and errors a true red so neither reads as brand pink. */
   --warn: #f2d24b;
-  --bad: #ff6f66;
+  --bad: #ff453a;
   --info: #6ab8ff;
   --r: 8px;
-  /* Filled main action: logo orange with black text, like the logo's "in"
-     tile (about 10:1 contrast). Hover lightens. --accent stays for rings. */
-  --accent-strong: #fe9801;
-  --accent-strong-hover: #ffad33;
+  /* Filled main action: logo pink with black text, like the logo's eyes
+     (about 7:1 contrast). Hover lightens. --accent stays for rings. */
+  --accent-strong: #ff5c8a;
+  --accent-strong-hover: #ff85a8;
   --on-accent: #000000;
 }
 
