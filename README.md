@@ -1,5 +1,7 @@
 # LockedIn
 
+![LockedIn](docs/brand/poster.png)
+
 One place to get focused work done: pick a task, start a timer, and LockedIn blocks distracting sites until the timer ends, then logs the time against that task.
 
 New here? Every step with full detail is in [SETUP.md](SETUP.md). This README is the short version.
