@@ -519,8 +519,11 @@ export function ProjectsPanel({
   const projectIds = projects.map((project) => project.id);
 
   return (
-    <section aria-label="Projects" className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-4">
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+    <section
+      aria-label="Projects"
+      className="flex max-h-[75vh] min-h-0 flex-col rounded-lg border border-[var(--line)] bg-[var(--surface)] p-4"
+    >
+      <div className="mb-4 flex shrink-0 flex-wrap items-center justify-between gap-3">
         <h2 className="text-base font-semibold text-[var(--fg)]">Projects</h2>
         <form
           className="flex w-full gap-2 sm:w-auto"
@@ -551,27 +554,30 @@ export function ProjectsPanel({
         </form>
       </div>
 
-      {projects.length === 0 ? (
-        <p className="text-sm text-[var(--muted)]">No projects yet. Add one above to get started.</p>
-      ) : (
-        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onProjectDragEnd}>
-          <SortableContext items={projectIds} strategy={verticalListSortingStrategy}>
-            <div className="space-y-3">
-              {projects.map((project) => (
-                <ProjectBlock
-                  key={project.id}
-                  project={project}
-                  collapsed={collapsedIds.includes(project.id)}
-                  onToggleCollapsed={() => toggleCollapsed(project.id)}
-                  handlers={handlers}
-                  onOpenLinks={setLinksOwner}
-                  sessionActive={sessionActive}
-                />
-              ))}
-            </div>
-          </SortableContext>
-        </DndContext>
-      )}
+      {/* Only the project list scrolls; the title and add form stay put. */}
+      <div className="min-h-0 flex-1 overflow-y-auto pr-1">
+        {projects.length === 0 ? (
+          <p className="text-sm text-[var(--muted)]">No projects yet. Add one above to get started.</p>
+        ) : (
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onProjectDragEnd}>
+            <SortableContext items={projectIds} strategy={verticalListSortingStrategy}>
+              <div className="space-y-3">
+                {projects.map((project) => (
+                  <ProjectBlock
+                    key={project.id}
+                    project={project}
+                    collapsed={collapsedIds.includes(project.id)}
+                    onToggleCollapsed={() => toggleCollapsed(project.id)}
+                    handlers={handlers}
+                    onOpenLinks={setLinksOwner}
+                    sessionActive={sessionActive}
+                  />
+                ))}
+              </div>
+            </SortableContext>
+          </DndContext>
+        )}
+      </div>
 
       {linksOwner && (
         <LinksModal
