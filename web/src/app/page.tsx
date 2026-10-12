@@ -1,9 +1,7 @@
 // Dashboard entry (T1): server-loads today's data in Chicago time and hands it
 // to the client shell that talks to the extension bridge. The EOD (T6b) and
-// wind-down (T6a-1) sections mount at page level with their own openers.
-import EodSection from "@/components/EodPreviewModal";
+// wind-down (T6a-1) openers sit inside the shell: Reports and the Wind down card.
 import { LockedInApp } from "@/components/lockedin-app";
-import WindDownSection from "@/components/wind-down-modal";
 import { loadDashboardData, type DashboardData } from "@/lib/dashboard-data";
 
 export const dynamic = "force-dynamic";
@@ -26,11 +24,5 @@ export default async function DashboardPage() {
     );
   }
 
-  return (
-    <>
-      <LockedInApp initialData={data} />
-      <EodSection />
-      <WindDownSection />
-    </>
-  );
+  return <LockedInApp initialData={data} />;
 }

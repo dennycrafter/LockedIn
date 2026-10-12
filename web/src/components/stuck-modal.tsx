@@ -86,6 +86,7 @@ export function StuckModal({
   onChanged,
   onStartTask,
   initialMode,
+  trigger = "card",
 }: {
   projects: ProjectData[];
   /** Success and failure messages surface through the dashboard toast. */
@@ -97,6 +98,8 @@ export function StuckModal({
   /** SPEC 8.15: the configured helper mode decides how the modal opens; the
    * in-modal switch still works within an open session. */
   initialMode?: "scripted" | "ai";
+  /** "pill" shows a small top bar button instead of the card when closed. */
+  trigger?: "card" | "pill";
 }) {
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<"scripted" | "ai">("scripted");
@@ -230,6 +233,14 @@ export function StuckModal({
       setLoopBusy(false);
     }
   };
+
+  if (!open && trigger === "pill") {
+    return (
+      <button type="button" onClick={openFresh} className="rounded-md border border-[var(--line)] px-3 py-1.5 text-sm text-[var(--muted)] transition-colors hover:border-[var(--muted)] hover:text-[var(--fg)]">
+        I&apos;m stuck, help me start
+      </button>
+    );
+  }
 
   if (!open) {
     return (

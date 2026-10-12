@@ -85,6 +85,7 @@ export function OrganizeModal({
   onChanged,
   onStartItem,
   initialMode,
+  trigger = "card",
 }: {
   projects: ProjectData[];
   miscTasks: MiscTaskData[];
@@ -97,6 +98,8 @@ export function OrganizeModal({
   /** SPEC 8.15: the configured helper mode decides how the modal opens; the
    * in-modal switch still works within an open session. */
   initialMode?: "scripted" | "ai";
+  /** "pill" shows a small top bar button instead of the card when closed. */
+  trigger?: "card" | "pill";
 }) {
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<"scripted" | "ai">("scripted");
@@ -246,6 +249,14 @@ export function OrganizeModal({
       </div>
     );
   };
+
+  if (!open && trigger === "pill") {
+    return (
+      <button type="button" onClick={openFresh} className="rounded-md border border-[var(--line)] px-3 py-1.5 text-sm text-[var(--muted)] transition-colors hover:border-[var(--muted)] hover:text-[var(--fg)]">
+        Organize my task list
+      </button>
+    );
+  }
 
   if (!open) {
     return (

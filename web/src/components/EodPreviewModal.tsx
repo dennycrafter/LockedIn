@@ -56,7 +56,7 @@ function Field({
   );
 }
 
-export default function EodSection() {
+export default function EodSection({ buttonClassName }: { buttonClassName?: string } = {}) {
   const [state, dispatch] = useReducer(eodModalReducer, undefined, eodModalInitialState);
   const open = state.status !== "closed";
 
@@ -141,7 +141,10 @@ export default function EodSection() {
         aria-haspopup="dialog"
         aria-expanded={open}
         onClick={() => dispatch({ type: "open" })}
-        className="rounded-md border border-[var(--line)] px-3 py-1.5 text-sm text-[var(--muted)] transition-colors hover:border-[var(--muted)] hover:text-[var(--fg)]"
+        className={
+          buttonClassName ??
+          "rounded-md border border-[var(--line)] px-3 py-1.5 text-sm text-[var(--muted)] transition-colors hover:border-[var(--muted)] hover:text-[var(--fg)]"
+        }
       >
         Send EOD
       </button>

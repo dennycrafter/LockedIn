@@ -57,32 +57,19 @@ export function timeByProject(sessions: SessionData[], projects: ProjectData[]):
     .sort((a, b) => b.minutes - a.minutes);
 }
 
-function Stat({ label, value, index }: { label: string; value: string; index: number }) {
-  const secondCol = index % 2 === 1;
-  const secondRow = index >= 2;
+const LABEL = "text-xs uppercase leading-snug tracking-wide text-[var(--muted)]";
+
+// Big numbers use Saira (SPEC 10: display font only for digits).
+function BigNumber({ value }: { value: string }) {
   return (
     <div
-      className="min-w-0 px-4 py-3"
+      className="mt-1 break-words leading-tight text-[var(--fg)]"
       style={{
-        ...(secondCol ? { borderLeft: "1px solid var(--line)" } : {}),
-        ...(secondRow ? { borderTop: "1px solid var(--line)" } : {}),
+        fontFamily: "var(--font-saira), ui-sans-serif, system-ui, sans-serif",
+        fontSize: "1.875rem",
       }}
     >
-      <div className="text-xs uppercase leading-snug tracking-wide text-[var(--muted)]">{label}</div>
-      <div
-        className="break-words leading-tight text-[var(--fg)]"
-        style={
-          value.length <= 8
-            ? {
-                // Big numbers get Saira at 2xl (SPEC 10: display font only for digits).
-                fontFamily: "var(--font-saira), ui-sans-serif, system-ui, sans-serif",
-                fontSize: "1.5rem",
-              }
-            : { fontSize: "1rem" }
-        }
-      >
-        {value}
-      </div>
+      {value}
     </div>
   );
 }
@@ -93,53 +80,78 @@ export function StatsStrip({
   projects,
   liveSession,
   nowMs,
+  startSlot,
+  reportsSlot,
 }: {
   sessions: SessionData[];
   infractions: InfractionData[];
   projects: ProjectData[];
   liveSession: ExtensionSession | null;
   nowMs: number;
+  /** The "Start working" button, shown under Work today. */
+  startSlot?: React.ReactNode;
+  /** The report buttons, shown in the Reports cell. */
+  reportsSlot?: React.ReactNode;
 }) {
   const top = topInfraction(infractions);
   const byProject = timeByProject(sessions, projects);
   const maxMinutes = Math.max(1, ...byProject.map((p) => p.minutes));
-  const stats: Array<{ label: string; value: string }> = [
-    { label: "Work today", value: formatFocusedMs(workTodaySeconds(sessions, liveSession, nowMs) * 1000) },
-    { label: "Sessions today", value: String(sessions.length) },
-    { label: "Infractions today", value: String(infractions.length) },
-    { label: "Top infraction", value: top ? `${top.label} (${top.count})` : "None yet" },
-  ];
+  const shown = byProject.slice(0, 3);
+  const hidden = byProject.length - shown.length;
+
+  // One strip split by 1px lines: the grid background is the line colour and
+  // every cell paints its own surface on top, so the gap shows as a divider.
+  const cell = "min-w-0 bg-[var(--surface)] px-5 py-4";
 
   return (
     <section aria-label="Today's stats">
-      <div className="grid grid-cols-2 rounded-lg border border-[var(--line)] bg-[var(--surface)]">
-        {stats.map((stat, index) => (
-          <Stat key={stat.label} label={stat.label} value={stat.value} index={index} />
-        ))}
-      </div>
+      <div className="grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-[var(--line)] bg-[var(--line)] lg:grid-cols-[1.1fr_0.7fr_1fr_1.6fr_0.8fr]">
+        <div className={`${cell} col-span-2 lg:col-span-1`}>
+          <div className={LABEL}>Work today</div>
+          <BigNumber value={formatFocusedMs(workTodaySeconds(sessions, liveSession, nowMs) * 1000)} />
+          {startSlot ? <div className="mt-3">{startSlot}</div> : null}
+        </div>
 
-      <div className="mt-4 rounded-lg border border-[var(--line)] bg-[var(--surface)] p-4">
-        <h3 className="text-sm text-[var(--muted)]">Time by project (today)</h3>
-        {byProject.length === 0 ? (
-          <p className="mt-2 text-sm text-[var(--muted)]">No sessions yet today.</p>
-        ) : (
-          <ul className="mt-3 space-y-2">
-            {byProject.map((row) => (
-              <li key={row.name} className="flex min-w-0 items-center gap-3 text-sm">
-                <span className="min-w-0 flex-1 truncate text-[var(--fg)]">{row.name}</span>
-                <span className="h-2 w-16 shrink-0 overflow-hidden rounded-sm bg-[var(--surface-2)]">
-                  <span
-                    className="block h-full rounded-sm bg-[var(--muted)]"
-                    style={{ width: `${Math.round((row.minutes / maxMinutes) * 100)}%` }}
-                  />
-                </span>
-                <span className="w-12 shrink-0 text-right text-[var(--muted)]">
-                  {Math.round(row.minutes)}m
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
+        <div className={cell}>
+          <div className={LABEL}>Sessions</div>
+          <BigNumber value={String(sessions.length)} />
+        </div>
+
+        <div className={cell}>
+          <div className={LABEL}>Infractions today</div>
+          <BigNumber value={String(infractions.length)} />
+          <div className="mt-2 text-xs text-[var(--muted)]">
+            Top infraction: <span className="text-[var(--fg)]">{top ? `${top.label} (${top.count})` : "None yet"}</span>
+          </div>
+        </div>
+
+        <div className={`${cell} col-span-2 lg:col-span-1`}>
+          <div className={LABEL}>Time by project (today)</div>
+          {byProject.length === 0 ? (
+            <p className="mt-2 text-sm text-[var(--muted)]">No sessions yet today.</p>
+          ) : (
+            <ul className="mt-2 space-y-1.5">
+              {shown.map((row) => (
+                <li key={row.name} className="flex min-w-0 items-center gap-3 text-sm">
+                  <span className="min-w-0 flex-1 truncate text-[var(--fg)]">{row.name}</span>
+                  <span className="h-1.5 w-16 shrink-0 overflow-hidden rounded-sm bg-[var(--surface-2)]">
+                    <span
+                      className="block h-full rounded-sm bg-[var(--muted)]"
+                      style={{ width: `${Math.round((row.minutes / maxMinutes) * 100)}%` }}
+                    />
+                  </span>
+                  <span className="w-10 shrink-0 text-right text-[var(--muted)]">{Math.round(row.minutes)}m</span>
+                </li>
+              ))}
+              {hidden > 0 && <li className="text-xs text-[var(--muted)]">+{hidden} more</li>}
+            </ul>
+          )}
+        </div>
+
+        <div className={`${cell} col-span-2 lg:col-span-1`}>
+          <div className={LABEL}>Reports</div>
+          {reportsSlot ? <div className="mt-2">{reportsSlot}</div> : null}
+        </div>
       </div>
     </section>
   );

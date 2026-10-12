@@ -15,7 +15,9 @@ import { runSyncCycle } from "@/lib/sync-cycle";
 import { toExtensionTree } from "@/lib/extension-tree";
 import { BlockedSitesPanel } from "./blocked-sites-panel";
 import { CelebrationOverlay } from "./celebration-overlay";
+import EodSection from "./EodPreviewModal";
 import { MiscTasksPanel } from "./misc-tasks-panel";
+import { Modal } from "./modal";
 import { NotesPanel } from "./notes-panel";
 import { OpenLoopsPanel } from "./open-loops-panel";
 import { OrganizeModal } from "./organize-modal";
@@ -28,10 +30,18 @@ import { StatsStrip } from "./stats-strip";
 import { TimeStudyPanel } from "./time-study-panel";
 import { TimeStudyPromptCard } from "./time-study-prompt";
 import { TomorrowPlanPanel } from "./tomorrow-plan-panel";
+import WindDownSection from "./wind-down-modal";
 
 type ConnectionState = "checking" | "connected" | "disconnected";
 
 const JSON_HEADERS = { "Content-Type": "application/json" };
+
+// Quiet buttons: one accent button per screen ("Start working"), the rest neutral.
+const PILL =
+  "rounded-md border border-[var(--line)] px-3 py-1.5 text-sm text-[var(--muted)] transition-colors hover:border-[var(--muted)] hover:text-[var(--fg)]";
+const WIDE_BUTTON =
+  "w-full rounded-md border border-[var(--line)] bg-[var(--surface-2)] px-3 py-2 text-sm text-[var(--fg)] transition-colors hover:border-[var(--muted)]";
+const CARD = "rounded-lg border border-[var(--line)] bg-[var(--surface)] p-4";
 
 function connectionDot(state: ConnectionState): { background: string; text: string } {
   if (state === "connected") return { background: "var(--ok)", text: "Extension connected" };
@@ -57,6 +67,8 @@ export function LockedInApp({ initialData }: { initialData: DashboardData }) {
   // Global "Float timer" toggle (SPEC 8.6), mirrored from the extension.
   const [floatEnabled, setFloatEnabled] = useState(true);
   const [toast, setToast] = useState<string | null>(null);
+  // Top bar tools that open in a floating window.
+  const [tool, setTool] = useState<"sites" | "study" | null>(null);
   const [sitesError, setSitesError] = useState<string | null>(null);
   const [settingsError, setSettingsError] = useState<string | null>(null);
   // SPEC 8.15: whether the Anthropic key is configured, from the server's
@@ -580,66 +592,117 @@ export function LockedInApp({ initialData }: { initialData: DashboardData }) {
 
   const dot = connectionDot(connection);
 
+  const startButton = (
+    <button
+      type="button"
+      onClick={() => {
+        setJustEnded(false);
+        setStartWith(null);
+        setStartMiscTask(null);
+        setStartOpen(true);
+      }}
+      disabled={connection === "disconnected"}
+      className="w-full rounded-md px-4 py-2.5 text-sm font-medium text-white disabled:opacity-50"
+      style={{ background: "var(--accent-strong)" }}
+    >
+      {justEnded ? "Start another session" : "Start working"}
+    </button>
+  );
+
   return (
     <main className="mx-auto flex min-h-screen max-w-[1760px] flex-col gap-6 px-[clamp(16px,2.6vw,40px)] py-6">
-      <header className="sticky top-0 z-10 -mx-[clamp(16px,2.6vw,40px)] flex flex-wrap items-center gap-3 border-b border-[var(--line)] bg-[color-mix(in_srgb,var(--bg)_82%,transparent)] px-[clamp(16px,2.6vw,40px)] py-3 backdrop-blur">
+      <header className="sticky top-0 z-10 -mx-[clamp(16px,2.6vw,40px)] flex flex-wrap items-center gap-3 border-b border-[var(--line)] px-[clamp(16px,2.6vw,40px)] py-3">
+        {/* The frosted layer sits behind the bar, not on it: a blur on the bar itself would trap the pop-up windows inside it. */}
+        <div
+          aria-hidden
+          className="absolute inset-0 -z-10 bg-[color-mix(in_srgb,var(--bg)_82%,transparent)] backdrop-blur"
+        />
         <span className="text-lg font-semibold text-[var(--fg)]">LockedIn</span>
         <span className="hidden text-sm text-[var(--muted)] sm:inline">
           Welcome back, {data.settings.display_name}
         </span>
-        <span
-          className="ml-auto flex items-center gap-2 rounded-full border border-[var(--line)] px-3 py-1 text-xs"
-          style={{ color: dot.background }}
-        >
-          <span aria-hidden className="inline-block h-2 w-2 rounded-full" style={{ background: dot.background }} />
-          {dot.text}
-        </span>
-        <ProfileMenu settings={data.settings} aiAvailable={aiAvailable} error={settingsError} onSave={saveSettings} />
+        <ProfileMenu
+          settings={data.settings}
+          aiAvailable={aiAvailable}
+          error={settingsError}
+          onSave={saveSettings}
+          align="left"
+        />
+        <div className="ml-auto flex flex-wrap items-center gap-2">
+          <button type="button" onClick={() => setTool("sites")} className={PILL}>
+            Edit blocked sites
+          </button>
+          <button type="button" onClick={() => setTool("study")} className={PILL}>
+            Time study
+          </button>
+          <OrganizeModal
+            trigger="pill"
+            projects={data.projects}
+            miscTasks={data.miscTasks}
+            initialMode={data.settings.helper_mode}
+            onToast={showToast}
+            onChanged={() => void refetchData()}
+            onStartItem={(item) => {
+              // Existing dialog only pre-targets misc items; task targeting
+              // lands with T3's row timer work (SPEC 8.4).
+              if (item.kind === "misc") setStartMiscTask({ id: item.id, title: item.title });
+              setStartOpen(true);
+            }}
+          />
+          <StuckModal
+            trigger="pill"
+            projects={data.projects}
+            initialMode={data.settings.helper_mode}
+            onToast={showToast}
+            onChanged={() => void refetchData()}
+            onStartTask={(taskId) => {
+              // Same handoff the organize flow uses: pre-target the existing
+              // start dialog; with no task picked, open it clean.
+              setStartMiscTask(null);
+              if (taskId) startOnTask(taskId);
+              else setStartWith(null);
+              setStartOpen(true);
+            }}
+          />
+          <span
+            className="flex items-center gap-2 rounded-full border border-[var(--line)] px-3 py-1 text-xs"
+            style={{ color: dot.background }}
+          >
+            <span aria-hidden className="inline-block h-2 w-2 rounded-full" style={{ background: dot.background }} />
+            {dot.text}
+          </span>
+        </div>
       </header>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,7fr)_minmax(0,12fr)_minmax(0,5fr)]">
-        <div className="flex flex-col gap-4">
-          <StatsStrip
-            sessions={data.todaySessions}
-            infractions={data.todayInfractions}
-            projects={data.projects}
-            liveSession={session}
-            nowMs={nowMs}
-          />
-          {session ? (
-            <SessionPanel
-              session={session}
-              nowMs={nowMs}
-              softUnlockAtMs={softUnlockAt}
-              floatEnabled={floatEnabled}
-              onToggleFloat={toggleFloat}
-              onControl={controlSession}
-              onManualInfraction={addManualInfraction}
-            />
-          ) : (
-            <button
-              type="button"
-              onClick={() => {
-                setJustEnded(false);
-                setStartWith(null);
-                setStartMiscTask(null);
-                setStartOpen(true);
-              }}
-              disabled={connection === "disconnected"}
-              className="rounded-md px-4 py-3 text-sm font-medium text-white disabled:opacity-50"
-              style={{ background: "var(--accent-strong)" }}
-            >
-              {justEnded ? "Start another session" : "Start working"}
-            </button>
-          )}
-          {connection === "disconnected" && (
-            <p className="text-xs text-[var(--warn)]">
-              The extension is not connected, so sessions and blocking are unavailable. Check the Dashboard URL in the
-              extension popup.
-            </p>
-          )}
-        </div>
+      {session && (
+        <SessionPanel
+          session={session}
+          nowMs={nowMs}
+          softUnlockAtMs={softUnlockAt}
+          floatEnabled={floatEnabled}
+          onToggleFloat={toggleFloat}
+          onControl={controlSession}
+          onManualInfraction={addManualInfraction}
+        />
+      )}
 
+      <StatsStrip
+        sessions={data.todaySessions}
+        infractions={data.todayInfractions}
+        projects={data.projects}
+        liveSession={session}
+        nowMs={nowMs}
+        startSlot={session ? null : startButton}
+        reportsSlot={<EodSection buttonClassName={WIDE_BUTTON} />}
+      />
+      {connection === "disconnected" && (
+        <p className="-mt-3 text-xs text-[var(--warn)]">
+          The extension is not connected, so sessions and blocking are unavailable. Check the Dashboard URL in the
+          extension popup.
+        </p>
+      )}
+
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,7fr)_minmax(0,3fr)]">
         <ProjectsPanel
           projects={data.projects}
           handlers={panelHandlers}
@@ -648,6 +711,13 @@ export function LockedInApp({ initialData }: { initialData: DashboardData }) {
         />
 
         <div className="flex flex-col gap-4">
+          <section aria-label="Wind down and night prep" className={CARD}>
+            <h2 className="text-base font-semibold text-[var(--fg)]">Wind down &amp; night prep</h2>
+            <p className="mt-1 text-xs text-[var(--muted)]">Eight quick steps to set up tomorrow.</p>
+            <div className="mt-3">
+              <WindDownSection buttonClassName={WIDE_BUTTON} />
+            </div>
+          </section>
           <TomorrowPlanPanel
             startDisabled={session !== null}
             onToggleTask={panelHandlers.onToggleTask}
@@ -671,13 +741,24 @@ export function LockedInApp({ initialData }: { initialData: DashboardData }) {
               }
             }}
           />
-          <OpenLoopsPanel loops={data.openLoops} onCreate={createLoop} onDelete={deleteLoop} />
-          <TimeStudyPanel
-            entries={data.todayTimeStudies}
-            intervalMinutes={data.settings.time_study_minutes}
-            onChangeInterval={(minutes) => void changeTimeStudyInterval(minutes)}
-          />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <NotesPanel
+          projects={data.projects}
+          onAttached={() => {
+            showToast("Snippet attached");
+            void refetchData();
+          }}
+        />
+        <OpenLoopsPanel loops={data.openLoops} onCreate={createLoop} onDelete={deleteLoop} />
+      </div>
+
+      {tool === "sites" && (
+        <Modal title="Edit blocked sites" onClose={() => setTool(null)}>
           <BlockedSitesPanel
+            bare
             sites={data.blockedSites}
             onAdd={(input) => void addSites({ inputs: [input] })}
             onAddSocialPack={() => void addSites({ socialPack: true })}
@@ -688,42 +769,19 @@ export function LockedInApp({ initialData }: { initialData: DashboardData }) {
             }}
             error={sitesError}
           />
-          <NotesPanel
-            projects={data.projects}
-            onAttached={() => {
-              showToast("Snippet attached");
-              void refetchData();
-            }}
+        </Modal>
+      )}
+
+      {tool === "study" && (
+        <Modal title="Time study" onClose={() => setTool(null)}>
+          <TimeStudyPanel
+            bare
+            entries={data.todayTimeStudies}
+            intervalMinutes={data.settings.time_study_minutes}
+            onChangeInterval={(minutes) => void changeTimeStudyInterval(minutes)}
           />
-          <OrganizeModal
-            projects={data.projects}
-            miscTasks={data.miscTasks}
-            initialMode={data.settings.helper_mode}
-            onToast={showToast}
-            onChanged={() => void refetchData()}
-            onStartItem={(item) => {
-              // Existing dialog only pre-targets misc items; task targeting
-              // lands with T3's row timer work (SPEC 8.4).
-              if (item.kind === "misc") setStartMiscTask({ id: item.id, title: item.title });
-              setStartOpen(true);
-            }}
-          />
-          <StuckModal
-            projects={data.projects}
-            initialMode={data.settings.helper_mode}
-            onToast={showToast}
-            onChanged={() => void refetchData()}
-            onStartTask={(taskId) => {
-              // Same handoff the organize flow uses: pre-target the existing
-              // start dialog; with no task picked, open it clean.
-              setStartMiscTask(null);
-              if (taskId) startOnTask(taskId);
-              else setStartWith(null);
-              setStartOpen(true);
-            }}
-          />
-        </div>
-      </div>
+        </Modal>
+      )}
 
       {startOpen && (
         <StartSessionDialog

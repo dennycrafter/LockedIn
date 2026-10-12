@@ -24,6 +24,7 @@ export function ProfileMenu({
   aiAvailable,
   error,
   onSave,
+  align = "right",
 }: {
   settings: SettingsData;
   /** Server-computed Anthropic key presence (GET /api/settings); the toggle
@@ -36,6 +37,8 @@ export function ProfileMenu({
     helper_mode?: HelperMode;
     wind_down_time?: string;
   }) => void;
+  /** Which edge of the button the pop-up lines up with. */
+  align?: "left" | "right";
 }) {
   const [open, setOpen] = useState(false);
   const [nameDraft, setNameDraft] = useState(settings.display_name);
@@ -76,7 +79,7 @@ export function ProfileMenu({
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full z-30 mt-2 w-72 rounded-lg border border-[var(--line)] bg-[var(--surface-2)] p-4 shadow-[0_6px_16px_rgba(0,0,0,0.3)]">
+        <div className={`absolute ${align === "left" ? "left-0" : "right-0"} top-full z-30 mt-2 w-72 rounded-lg border border-[var(--line)] bg-[var(--surface-2)] p-4 shadow-[0_6px_16px_rgba(0,0,0,0.3)]`}>
           <form
             className="space-y-3"
             onSubmit={(event) => {

@@ -57,7 +57,7 @@ const selectClass =
 const inputClass =
   "mt-1 w-full rounded-md border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--fg)]";
 
-export default function WindDownSection() {
+export default function WindDownSection({ buttonClassName }: { buttonClassName?: string } = {}) {
   const [state, dispatch] = useReducer(windDownModalReducer, undefined, windDownModalInitialState);
   const open = state.status !== "closed";
   const { draft, payload } = state;
@@ -513,7 +513,10 @@ export default function WindDownSection() {
         aria-haspopup="dialog"
         aria-expanded={open}
         onClick={() => dispatch({ type: "open" })}
-        className="rounded-md border border-[var(--line)] px-3 py-1.5 text-sm text-[var(--muted)] transition-colors hover:border-[var(--muted)] hover:text-[var(--fg)]"
+        className={
+          buttonClassName ??
+          "rounded-md border border-[var(--line)] px-3 py-1.5 text-sm text-[var(--muted)] transition-colors hover:border-[var(--muted)] hover:text-[var(--fg)]"
+        }
       >
         Wind down
       </button>

@@ -520,37 +520,36 @@ export function ProjectsPanel({
 
   return (
     <section aria-label="Projects" className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-4">
-      <div className="mb-3 flex items-center justify-between">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-base font-semibold text-[var(--fg)]">Projects</h2>
-      </div>
-
-      <form
-        className="mb-4 flex gap-2"
-        onSubmit={(event) => {
-          event.preventDefault();
-          const name = newProjectName.trim();
-          if (name) {
-            handlers.onCreateProject(name);
-            setNewProjectName("");
-          }
-        }}
-      >
-        <input
-          type="text"
-          value={newProjectName}
-          onChange={(event) => setNewProjectName(event.target.value)}
-          placeholder="New project name"
-          aria-label="New project name"
-          className="min-w-0 flex-1 rounded-md border border-[var(--line)] bg-[var(--bg)] px-3 py-1.5 text-sm text-[var(--fg)] placeholder:text-[var(--muted)]"
-        />
-        <button
-          type="submit"
-          disabled={newProjectName.trim() === ""}
-          className="rounded-md border border-[var(--line)] px-3 py-1.5 text-sm text-[var(--fg)] hover:border-[var(--muted)] disabled:opacity-50"
+        <form
+          className="flex w-full gap-2 sm:w-auto"
+          onSubmit={(event) => {
+            event.preventDefault();
+            const name = newProjectName.trim();
+            if (name) {
+              handlers.onCreateProject(name);
+              setNewProjectName("");
+            }
+          }}
         >
-          Add project
-        </button>
-      </form>
+          <input
+            type="text"
+            value={newProjectName}
+            onChange={(event) => setNewProjectName(event.target.value)}
+            placeholder="New project name"
+            aria-label="New project name"
+            className="min-w-0 flex-1 rounded-md border border-[var(--line)] bg-[var(--bg)] px-3 py-1.5 text-sm text-[var(--fg)] placeholder:text-[var(--muted)] sm:w-64 sm:flex-none"
+          />
+          <button
+            type="submit"
+            disabled={newProjectName.trim() === ""}
+            className="rounded-md border border-[var(--line)] px-3 py-1.5 text-sm text-[var(--fg)] hover:border-[var(--muted)] disabled:opacity-50"
+          >
+            Add project
+          </button>
+        </form>
+      </div>
 
       {projects.length === 0 ? (
         <p className="text-sm text-[var(--muted)]">No projects yet. Add one above to get started.</p>

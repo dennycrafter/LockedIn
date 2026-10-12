@@ -12,19 +12,25 @@ export function BlockedSitesPanel({
   onAddSocialPack,
   onDelete,
   error,
+  bare = false,
 }: {
   sites: BlockedSiteData[];
   onAdd: (input: string) => void;
   onAddSocialPack: () => void;
   onDelete: (id: string) => void;
   error: string | null;
+  /** True inside a window that already has a title and border. */
+  bare?: boolean;
 }) {
   const [draft, setDraft] = useState("");
 
   return (
-    <section aria-label="Edit blocked sites" className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-4">
-      <h2 className="text-base font-semibold text-[var(--fg)]">Edit blocked sites</h2>
-      <p className="mt-1 text-xs text-[var(--muted)]">
+    <section
+      aria-label="Edit blocked sites"
+      className={bare ? "" : "rounded-lg border border-[var(--line)] bg-[var(--surface)] p-4"}
+    >
+      {!bare && <h2 className="text-base font-semibold text-[var(--fg)]">Edit blocked sites</h2>}
+      <p className={`${bare ? "" : "mt-1 "}text-xs text-[var(--muted)]`}>
         Full URL or bare domain. Blocking covers the domain and all subdomains.
       </p>
 

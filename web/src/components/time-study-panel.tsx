@@ -18,18 +18,21 @@ export function TimeStudyPanel({
   entries,
   intervalMinutes,
   onChangeInterval,
+  bare = false,
 }: {
   entries: TimeStudyEntryData[];
   intervalMinutes: number | null;
   onChangeInterval: (minutes: number | null) => void;
+  /** True inside a window that already has a title and border. */
+  bare?: boolean;
 }) {
   return (
     <section
       aria-label="Time study"
-      className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-4"
+      className={bare ? "" : "rounded-lg border border-[var(--line)] bg-[var(--surface)] p-4"}
     >
-      <h2 className="text-base font-semibold text-[var(--fg)]">Time study</h2>
-      <p className="mt-1 text-sm text-[var(--muted)]">
+      {!bare && <h2 className="text-base font-semibold text-[var(--fg)]">Time study</h2>}
+      <p className={`${bare ? "" : "mt-1 "}text-sm text-[var(--muted)]`}>
         A check-in asks &quot;What are you doing right now?&quot; every few minutes and keeps your answers.
       </p>
 
