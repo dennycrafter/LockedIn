@@ -169,7 +169,7 @@ export function StuckModal({
         <button
           type="button"
           onClick={startFiveMinutes}
-          className="rounded-md px-4 py-2 text-sm font-medium text-white"
+          className="rounded-md px-4 py-2 text-sm font-medium text-[var(--on-accent)]"
           style={{ background: "var(--accent-strong)" }}
         >
           Start 5 minutes
@@ -322,7 +322,7 @@ export function StuckModal({
             <button
               type="button"
               onClick={goSuggest}
-              className="rounded-md px-4 py-2 text-sm font-medium text-white"
+              className="rounded-md px-4 py-2 text-sm font-medium text-[var(--on-accent)]"
               style={{ background: "var(--accent-strong)" }}
             >
               Next
@@ -357,7 +357,7 @@ export function StuckModal({
               <button
                 type="button"
                 onClick={startFiveMinutes}
-                className="rounded-md px-4 py-2 text-sm font-medium text-white"
+                className="rounded-md px-4 py-2 text-sm font-medium text-[var(--on-accent)]"
                 style={{ background: "var(--accent-strong)" }}
               >
                 Start 5 minutes
@@ -426,7 +426,7 @@ export function StuckModal({
                   type="button"
                   onClick={() => void parkLoop()}
                   disabled={loopText.trim() === "" || loopBusy}
-                  className="rounded-md px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+                  className="rounded-md px-4 py-2 text-sm font-medium text-[var(--on-accent)] disabled:opacity-50"
                   style={{ background: "var(--accent-strong)" }}
                 >
                   Park it as an open loop

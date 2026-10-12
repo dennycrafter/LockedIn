@@ -30,11 +30,11 @@ export const STYLE = `
   position: fixed;
   z-index: 2147483647;
   width: 220px;
-  background: #1c1c20;
-  border: 1px solid #2a2a30;
+  background: #1c1c1c;
+  border: 1px solid #2b2b2b;
   border-radius: 8px;
   box-shadow: 0 6px 16px rgba(0,0,0,.3);
-  color: #f2f2f4;
+  color: #f4f4f4;
   font-family: -apple-system, "Segoe UI", Inter, system-ui, sans-serif;
   font-size: 13px;
 }
@@ -43,12 +43,12 @@ export const STYLE = `
   align-items: center;
   gap: 6px;
   padding: 6px 8px;
-  border-bottom: 1px solid #2a2a30;
+  border-bottom: 1px solid #2b2b2b;
   cursor: grab;
   user-select: none;
   touch-action: none;
 }
-.header .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #9a9aa3; }
+.header .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #9b9b9b; }
 .digits {
   padding: 8px 12px 2px;
   font-family: "Saira", -apple-system, "Segoe UI", Inter, system-ui, sans-serif;
@@ -61,42 +61,42 @@ export const STYLE = `
 .controls { display: flex; gap: 6px; padding: 4px 8px 8px; }
 .controls button {
   background: transparent;
-  border: 1px solid #2a2a30;
+  border: 1px solid #2b2b2b;
   border-radius: 6px;
-  color: #f2f2f4;
+  color: #f4f4f4;
   cursor: pointer;
   font: inherit;
   padding: 3px 8px;
 }
-.controls button:hover { border-color: #9a9aa3; }
-.header button { border: none; background: transparent; color: #9a9aa3; cursor: pointer; font: inherit; padding: 0 4px; }
-.warn { color: #ffb547; }
+.controls button:hover { border-color: #9b9b9b; }
+.header button { border: none; background: transparent; color: #9b9b9b; cursor: pointer; font: inherit; padding: 0 4px; }
+.warn { color: #f2d24b; }
 .infraction { display: flex; gap: 6px; padding: 0 8px 8px; }
 .infraction input {
   flex: 1;
   min-width: 0;
-  background: #0b0b0d;
-  border: 1px solid #2a2a30;
+  background: #0a0a0a;
+  border: 1px solid #2b2b2b;
   border-radius: 6px;
-  color: #f2f2f4;
+  color: #f4f4f4;
   font: inherit;
   padding: 3px 8px;
 }
 .infraction button {
   background: transparent;
-  border: 1px solid #2a2a30;
+  border: 1px solid #2b2b2b;
   border-radius: 6px;
-  color: #f2f2f4;
+  color: #f4f4f4;
   cursor: pointer;
   font: inherit;
   padding: 3px 8px;
 }
-.feedback { color: #ffb547; font-size: 11px; padding: 0 12px 6px; display: none; }
+.feedback { color: #f2d24b; font-size: 11px; padding: 0 12px 6px; display: none; }
 `;
 
 function lockPill(lockMode: ActiveSession["lockMode"]): { background: string; color: string } {
   if (lockMode === "hard") return { background: "rgba(255,111,102,.18)", color: "#ff6f66" };
-  if (lockMode === "soft") return { background: "rgba(255,181,71,.18)", color: "#ffb547" };
+  if (lockMode === "soft") return { background: "rgba(242,210,75,.18)", color: "#f2d24b" };
   return { background: "rgba(106,184,255,.18)", color: "#6ab8ff" };
 }
 

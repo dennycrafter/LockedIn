@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useState, type FormEvent } from "react";
 
 export default function LoginPage() {
@@ -37,7 +38,10 @@ export default function LoginPage() {
         aria-label="Unlock LockedIn"
         className="w-full max-w-[320px] rounded-lg border border-[var(--line)] bg-[var(--surface)] p-6"
       >
-        <h1 className="text-lg font-semibold text-[var(--fg)]">LockedIn</h1>
+        <h1 className="flex items-center gap-2 text-lg font-semibold text-[var(--fg)]">
+          <Image src="/icon.png" alt="" width={30} height={30} priority className="h-[30px] w-[30px]" />
+          LockedIn
+        </h1>
         <p className="mb-5 mt-1 text-sm text-[var(--muted)]">Enter your dashboard password.</p>
         <label htmlFor="password" className="mb-1 block text-sm text-[var(--fg)]">
           Password
@@ -60,7 +64,7 @@ export default function LoginPage() {
         <button
           type="submit"
           disabled={pending}
-          className="w-full rounded-md bg-[var(--accent-strong)] px-3 py-2 font-medium text-white transition-colors hover:bg-[var(--accent-strong-hover)] disabled:opacity-60"
+          className="w-full rounded-md bg-[var(--accent-strong)] px-3 py-2 font-medium text-[var(--on-accent)] transition-colors hover:bg-[var(--accent-strong-hover)] disabled:opacity-60"
         >
           {pending ? "Checking..." : "Unlock"}
         </button>

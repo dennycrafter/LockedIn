@@ -24,7 +24,7 @@ export type ActionableAiEntry = Extract<AiChatEntry, { role: "assistant" }>;
 const INPUT =
   "min-w-0 flex-1 rounded-md border border-[var(--line)] bg-[var(--bg)] px-3 py-1.5 text-sm text-[var(--fg)] placeholder:text-[var(--muted)] disabled:opacity-50";
 
-const ACCENT_BUTTON = "rounded-md px-4 py-2 text-sm font-medium text-white disabled:opacity-50";
+const ACCENT_BUTTON = "rounded-md px-4 py-2 text-sm font-medium text-[var(--on-accent)] disabled:opacity-50";
 
 const SECONDARY_BUTTON =
   "rounded-md border border-[var(--line)] px-4 py-2 text-sm text-[var(--fg)] hover:border-[var(--muted)] disabled:opacity-50";

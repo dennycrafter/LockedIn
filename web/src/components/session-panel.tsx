@@ -125,7 +125,7 @@ export function SessionPanel({
           checked={floatEnabled}
           onChange={(event) => onToggleFloat(event.target.checked)}
           aria-label="Show the floating timer on other sites"
-          className="h-4 w-4 accent-[var(--accent)]"
+          className="h-4 w-4 accent-[var(--silver)]"
         />
         Float timer
       </label>

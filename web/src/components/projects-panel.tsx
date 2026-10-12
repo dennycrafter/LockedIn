@@ -52,7 +52,11 @@ export interface ProjectsPanelHandlers {
 }
 
 const HANDLE_CLASS = "cursor-grab select-none touch-none inline-flex h-6 w-6 items-center justify-center text-[var(--muted)] hover:text-[var(--fg)]";
-const ROW_CLASS = "flex items-center gap-2 px-3 py-2";
+// Rows wrap on narrow screens: the title keeps at least 9rem and the actions
+// drop to their own line on the right instead of squeezing the title.
+const ROW_CLASS = "flex flex-wrap items-center gap-x-2 gap-y-1 px-3 py-2";
+const TITLE_SLOT = "flex min-w-[9rem] flex-1";
+const ACTIONS = "ml-auto flex shrink-0 items-center gap-2";
 const ICON_BUTTON = "inline-flex h-6 min-w-6 shrink-0 items-center justify-center gap-0.5 px-1 text-xs text-[var(--muted)] hover:text-[var(--fg)]";
 const COLLAPSED_KEY = "lockedin-collapsed-projects";
 
@@ -145,11 +149,12 @@ function TaskRow({ task, depth, handlers, onOpenLinks, sessionActive }: RowProps
             onChange={(event) => setSubtaskDraft(event.target.value)}
             placeholder="+ Add subtask"
             aria-label={`New subtask in ${task.title}`}
-            className="min-w-0 flex-1 rounded-md border border-[var(--line)] bg-[var(--bg)] px-3 py-1 text-xs text-[var(--fg)] placeholder:text-[var(--muted)]"
+            className="min-w-0 flex-1 rounded-md border border-transparent bg-transparent px-3 py-1 text-xs text-[var(--fg)] placeholder:text-[var(--muted)] hover:border-[var(--line)] focus:border-[var(--line)] focus:bg-[var(--bg)]"
           />
+          {/* Quiet line until something is typed; Enter also adds. */}
           <button
             type="submit"
-            disabled={subtaskDraft.trim() === ""}
+            hidden={subtaskDraft.trim() === ""}
             className="rounded-md border border-[var(--line)] px-2 py-1 text-xs text-[var(--fg)] hover:border-[var(--muted)] disabled:opacity-50"
           >
             Add
@@ -176,14 +181,17 @@ function TaskRow({ task, depth, handlers, onOpenLinks, sessionActive }: RowProps
           checked={task.done}
           onChange={(event) => handlers.onToggleTask(task.id, event.target.checked)}
           aria-label={task.done ? `Mark ${task.title} not done` : `Mark ${task.title} done`}
-          className="h-4 w-4"
+          className="h-4 w-4 accent-[var(--silver)]"
         />
-        <EditableTitle
-          title={task.title}
-          onRename={(title) => handlers.onRenameTask(task.id, title)}
-          label={task.title}
-          className={`text-sm ${task.done ? "text-[var(--muted)] line-through" : "text-[var(--fg)]"}`}
-        />
+        <div className={TITLE_SLOT}>
+          <EditableTitle
+            title={task.title}
+            onRename={(title) => handlers.onRenameTask(task.id, title)}
+            label={task.title}
+            className={`text-sm ${task.done ? "text-[var(--muted)] line-through" : "text-[var(--fg)]"}`}
+          />
+        </div>
+        <div className={ACTIONS}>
         <button
           type="button"
           onClick={() => onOpenLinks({ ownerType: "task", ownerId: task.id, label: task.title })}
@@ -221,6 +229,7 @@ function TaskRow({ task, depth, handlers, onOpenLinks, sessionActive }: RowProps
         >
           Delete
         </button>
+        </div>
       </div>
 
       {notesOpen && (
@@ -380,12 +389,15 @@ function ProjectBlock({
         >
           {collapsed ? ">" : "v"}
         </button>
-        <EditableTitle
-          title={project.name}
-          onRename={(name) => handlers.onRenameProject(project.id, name)}
-          label={project.name}
-          className="text-sm font-medium"
-        />
+        <div className={TITLE_SLOT}>
+          <EditableTitle
+            title={project.name}
+            onRename={(name) => handlers.onRenameProject(project.id, name)}
+            label={project.name}
+            className="text-sm font-medium"
+          />
+        </div>
+        <div className={ACTIONS}>
         <ProgressRing percent={progress.percent} label={project.name} />
         <button
           type="button"
@@ -428,6 +440,7 @@ function ProjectBlock({
         >
           Delete
         </button>
+        </div>
       </div>
 
       {notesOpen && (

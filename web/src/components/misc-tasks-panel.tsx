@@ -60,7 +60,7 @@ function MiscTaskRow({
         checked={task.done}
         onChange={(event) => onToggle(task.id, event.target.checked)}
         aria-label={`Tick misc task: ${task.title}`}
-        className="h-4 w-4 accent-[var(--accent)]"
+        className="h-4 w-4 accent-[var(--silver)]"
       />
       <span
         className={`min-w-0 flex-1 truncate text-sm ${task.done ? "text-[var(--muted)] line-through" : "text-[var(--fg)]"}`}

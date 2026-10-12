@@ -5,6 +5,7 @@
 // pings for connection status, and runs the drain/save/ack sync cycle on load
 // and every 30 seconds (SPEC 8.17). T2 adds the full tree handlers, links,
 // settings, and the completion celebration (SPEC 8.2, 8.3, 8.10).
+import Image from "next/image";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { callExtension } from "@/lib/bridge-client";
 import type { CelebrationStyle, DashboardData, HelperMode, SettingsData } from "@/lib/dashboard-data";
@@ -602,7 +603,7 @@ export function LockedInApp({ initialData }: { initialData: DashboardData }) {
         setStartOpen(true);
       }}
       disabled={connection === "disconnected"}
-      className="w-full rounded-md px-4 py-2.5 text-sm font-medium text-white disabled:opacity-50"
+      className="w-full rounded-md px-4 py-2.5 text-sm font-medium text-[var(--on-accent)] disabled:opacity-50"
       style={{ background: "var(--accent-strong)" }}
     >
       {justEnded ? "Start another session" : "Start working"}
@@ -617,7 +618,11 @@ export function LockedInApp({ initialData }: { initialData: DashboardData }) {
           aria-hidden
           className="absolute inset-0 -z-10 bg-[color-mix(in_srgb,var(--bg)_82%,transparent)] backdrop-blur"
         />
-        <span className="text-lg font-semibold text-[var(--fg)]">LockedIn</span>
+        <span className="flex items-center gap-2 text-lg font-semibold text-[var(--fg)]">
+          {/* Brand mark: the orange "in" tile, same file as the favicon. */}
+          <Image src="/icon.png" alt="" width={30} height={30} priority className="h-7 w-7 sm:h-[30px] sm:w-[30px]" />
+          LockedIn
+        </span>
         <span className="hidden text-sm text-[var(--muted)] sm:inline">
           Welcome back, {data.settings.display_name}
         </span>

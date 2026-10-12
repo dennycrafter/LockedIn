@@ -290,7 +290,7 @@ export default function EodSection({ buttonClassName }: { buttonClassName?: stri
                     type="button"
                     onClick={send}
                     disabled={isSending}
-                    className="rounded-md bg-[var(--accent-strong)] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[var(--accent-strong-hover)] disabled:cursor-not-allowed disabled:opacity-60"
+                    className="rounded-md bg-[var(--accent-strong)] px-4 py-2 text-sm font-medium text-[var(--on-accent)] transition-colors hover:bg-[var(--accent-strong-hover)] disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     {isSending ? "Sending..." : "Send"}
                   </button>

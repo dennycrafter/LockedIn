@@ -158,7 +158,7 @@ export function AttachSnippetModal({
           type="button"
           onClick={() => add()}
           disabled={saving}
-          className="rounded-md px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+          className="rounded-md px-4 py-2 text-sm font-medium text-[var(--on-accent)] disabled:opacity-50"
           style={{ background: "var(--accent-strong)" }}
         >
           Add

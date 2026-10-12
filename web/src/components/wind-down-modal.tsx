@@ -573,7 +573,7 @@ export default function WindDownSection({ buttonClassName }: { buttonClassName?:
                     type="button"
                     onClick={() => dispatch({ type: "next" })}
                     disabled={isSaving}
-                    className="rounded-md px-4 py-1.5 text-sm font-medium text-white disabled:opacity-50"
+                    className="rounded-md px-4 py-1.5 text-sm font-medium text-[var(--on-accent)] disabled:opacity-50"
                     style={{ background: "var(--accent-strong)" }}
                   >
                     {draft.step === 7 ? "Task list finished" : "Next"}
@@ -583,7 +583,7 @@ export default function WindDownSection({ buttonClassName }: { buttonClassName?:
                     type="button"
                     onClick={() => void save()}
                     disabled={isSaving}
-                    className="rounded-md px-4 py-1.5 text-sm font-medium text-white disabled:opacity-50"
+                    className="rounded-md px-4 py-1.5 text-sm font-medium text-[var(--on-accent)] disabled:opacity-50"
                     style={{ background: "var(--accent-strong)" }}
                   >
                     {isSaving ? "Saving..." : "Ready for tomorrow"}

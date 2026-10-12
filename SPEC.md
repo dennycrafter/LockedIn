@@ -541,13 +541,15 @@ Acceptance:
 ```css
 :root {
   color-scheme: dark;
-  --bg: #0b0b0d; --surface: #121215; --surface-2: #1c1c20; --line: #2a2a30;
-  --fg: #f2f2f4; --muted: #9a9aa3; --silver: #e8e8ea;
-  --accent: #7c5cff; --accent-ink: #9d85ff;
-  --ok: #34d65c; --warn: #ffb547; --bad: #ff6f66; --info: #6ab8ff;
+  --bg: #0a0a0a; --surface: #131313; --surface-2: #1c1c1c; --line: #2b2b2b;
+  --fg: #f4f4f4; --muted: #9b9b9b; --silver: #e8e8e8;
+  --accent: #fe9801; --accent-ink: #ffad33; /* logo orange */
+  --accent-strong: #fe9801; --accent-strong-hover: #ffad33; --on-accent: #000000;
+  --ok: #34d65c; --warn: #f2d24b; --bad: #ff6f66; --info: #6ab8ff;
   --r: 8px;
 }
 ```
+- Brand colours come from the logo: black and orange (#fe9801). Filled orange buttons use black text, like the logo's "in" tile. Warnings stay yellow so they never read as the brand orange.
 - Corners: boxes 8px, buttons and inputs 6px. Pills only for status (lock mode, extension connected).
 - Four greys only (bg, surface, surface-2, line). Inputs sit on `--bg`.
 - Accent colour only on the ONE main action per screen ("Start working" on the dashboard, "Start session" in the start dialog, "Next" in step flows, "Send" in EOD).

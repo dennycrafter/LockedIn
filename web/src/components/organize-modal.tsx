@@ -226,7 +226,7 @@ export function OrganizeModal({
           }}
           disabled={planBusy || topItem === null || topItem.kind === "misc"}
           title={topItem?.kind === "misc" ? "Misc tasks cannot go in the plan." : undefined}
-          className="rounded-md px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+          className="rounded-md px-4 py-2 text-sm font-medium text-[var(--on-accent)] disabled:opacity-50"
           style={{ background: "var(--accent-strong)" }}
         >
           Make #1 my most important task
@@ -325,7 +325,7 @@ export function OrganizeModal({
                         checked={checkedIds.has(item.id)}
                         onChange={(event) => toggle(item.id, event.target.checked)}
                         aria-label={`Include in ranking: ${item.label}`}
-                        className="h-4 w-4 accent-[var(--accent)]"
+                        className="h-4 w-4 accent-[var(--silver)]"
                       />
                       <span className="min-w-0 flex-1 truncate text-sm text-[var(--fg)]">{item.label}</span>
                     </li>
@@ -349,7 +349,7 @@ export function OrganizeModal({
                         checked={checkedIds.has(item.id)}
                         onChange={(event) => toggle(item.id, event.target.checked)}
                         aria-label={`Include in ranking: ${item.label}`}
-                        className="h-4 w-4 accent-[var(--accent)]"
+                        className="h-4 w-4 accent-[var(--silver)]"
                       />
                       <span className="min-w-0 flex-1 truncate text-sm text-[var(--fg)]">{item.label}</span>
                       <span className="text-xs text-[var(--muted)]">
@@ -398,7 +398,7 @@ export function OrganizeModal({
                 setRateIndex(0);
                 setStep("rate");
               }}
-              className="rounded-md px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+              className="rounded-md px-4 py-2 text-sm font-medium text-[var(--on-accent)] disabled:opacity-50"
               style={{ background: "var(--accent-strong)" }}
             >
               Next
@@ -474,7 +474,7 @@ export function OrganizeModal({
                 if (isLastRating) setStep("ranked");
                 else setRateIndex(rateIndex + 1);
               }}
-              className="rounded-md px-4 py-2 text-sm font-medium text-white"
+              className="rounded-md px-4 py-2 text-sm font-medium text-[var(--on-accent)]"
               style={{ background: "var(--accent-strong)" }}
             >
               {isLastRating ? "Rank them" : "Next"}
@@ -520,7 +520,7 @@ export function OrganizeModal({
               onClick={() => void makeMostImportant(top.item)}
               disabled={planBusy || top?.item.kind === "misc"}
               title={top?.item.kind === "misc" ? "Misc tasks cannot go in the plan." : undefined}
-              className="rounded-md px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+              className="rounded-md px-4 py-2 text-sm font-medium text-[var(--on-accent)] disabled:opacity-50"
               style={{ background: "var(--accent-strong)" }}
             >
               Make #1 my most important task

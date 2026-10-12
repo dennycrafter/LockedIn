@@ -112,7 +112,7 @@ export function TomorrowPlanPanel({
                 type="checkbox"
                 onChange={() => void tick(plan.rows, row.taskId)}
                 aria-label={`Tick plan task: ${row.title}`}
-                className="mt-1 h-4 w-4 accent-[var(--accent)]"
+                className="mt-1 h-4 w-4 accent-[var(--silver)]"
               />
               <span className="min-w-0 flex-1">
                 {index === 0 && (

@@ -3,25 +3,28 @@
 /* Design tokens per SPEC section 10 (dark only). */
 :root {
   color-scheme: dark;
-  --bg: #0b0b0d;
-  --surface: #121215;
-  --surface-2: #1c1c20;
-  --line: #2a2a30;
-  --fg: #f2f2f4;
-  --muted: #9a9aa3;
-  --silver: #e8e8ea;
-  --accent: #7c5cff;
-  --accent-ink: #9d85ff;
+  /* Brand palette from the logo: pure black, neutral greys, one orange.
+     Greys are neutral (no blue tint) so they sit with the logo's black. */
+  --bg: #0a0a0a;
+  --surface: #131313;
+  --surface-2: #1c1c1c;
+  --line: #2b2b2b;
+  --fg: #f4f4f4;
+  --muted: #9b9b9b;
+  --silver: #e8e8e8;
+  --accent: #fe9801;
+  --accent-ink: #ffad33;
   --ok: #34d65c;
-  --warn: #ffb547;
+  /* Warning moved to yellow so it never reads as the brand orange. */
+  --warn: #f2d24b;
   --bad: #ff6f66;
   --info: #6ab8ff;
   --r: 8px;
-  /* Filled main-action background: #7c5cff with white text measures 4.34:1,
-     under the 4.5:1 bar WCAG and Lighthouse require, so filled buttons use
-     this darker step of the same hue. --accent stays for rings and focus. */
-  --accent-strong: #6e4df6;
-  --accent-strong-hover: #5f3ff0;
+  /* Filled main action: logo orange with black text, like the logo's "in"
+     tile (about 10:1 contrast). Hover lightens. --accent stays for rings. */
+  --accent-strong: #fe9801;
+  --accent-strong-hover: #ffad33;
+  --on-accent: #000000;
 }
 
 /* Display font for big numbers (SPEC 10). next/font exposes the Saira family
