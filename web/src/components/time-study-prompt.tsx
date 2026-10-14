@@ -5,6 +5,8 @@
 // dashboard. Saving queues the answer in the extension (flushed by the sync
 // cycle); dismissing hides just this prompt instance.
 import { useEffect, useState } from "react";
+import { CloseIcon } from "./icons";
+import { BTN_ICON, BTN_SECONDARY, INPUT_BOX } from "./ui";
 
 const DISMISSED_KEY = "lockedin-dismissed-time-study-prompts";
 
@@ -66,17 +68,15 @@ export function TimeStudyPromptCard({
     <div
       role="dialog"
       aria-label="Time study check-in"
-      className="fixed bottom-16 left-4 z-40 w-72 rounded-lg border border-[var(--line)] bg-[var(--surface-2)] p-4 shadow-[0_6px_16px_rgba(0,0,0,0.3)]"
+      className="fixed bottom-5 right-5 z-40 w-[min(20rem,calc(100vw-40px))] rounded-lg border border-[var(--line)] bg-[var(--surface-2)] p-4 shadow-[0_6px_16px_rgba(0,0,0,0.3)]"
     >
       <div className="flex items-start justify-between gap-2">
-        <p className="text-sm font-medium text-[var(--fg)]">What are you doing right now?</p>
-        <button
-          type="button"
-          onClick={dismiss}
-          aria-label="Dismiss time study prompt"
-          className="shrink-0 text-xs text-[var(--muted)] hover:text-[var(--fg)]"
-        >
-          Dismiss
+        <div>
+          <p className="text-xs font-medium uppercase tracking-wide text-[var(--muted)]">Time study check-in</p>
+          <p className="mt-0.5 text-sm font-medium text-[var(--fg)]">What are you doing right now?</p>
+        </div>
+        <button type="button" onClick={dismiss} aria-label="Dismiss time study prompt" title="Dismiss" className={`${BTN_ICON} -mr-2 -mt-2`}>
+          <CloseIcon />
         </button>
       </div>
       <form
@@ -84,7 +84,7 @@ export function TimeStudyPromptCard({
           event.preventDefault();
           submit();
         }}
-        className="mt-2 space-y-2"
+        className="mt-3 flex gap-2"
       >
         <input
           type="text"
@@ -93,19 +93,13 @@ export function TimeStudyPromptCard({
           placeholder="e.g. Writing the report"
           aria-label="What are you doing right now"
           autoFocus
-          className="w-full rounded-md border border-[var(--line)] bg-[var(--bg)] px-3 py-1.5 text-sm text-[var(--fg)] placeholder:text-[var(--muted)]"
+          className={`${INPUT_BOX} flex-1`}
         />
-        {error && <p className="text-xs text-[var(--bad)]">{error}</p>}
-        <div className="flex justify-end">
-          <button
-            type="submit"
-            disabled={saving || draft.trim() === ""}
-            className="rounded-md border border-[var(--line)] px-3 py-1.5 text-sm text-[var(--fg)] hover:border-[var(--muted)] disabled:opacity-50"
-          >
-            {saving ? "Saving..." : "Save"}
-          </button>
-        </div>
+        <button type="submit" disabled={saving || draft.trim() === ""} className={BTN_SECONDARY}>
+          {saving ? "Saving..." : "Save"}
+        </button>
       </form>
+      {error && <p className="mt-2 text-[13px] text-[var(--bad)]">{error}</p>}
     </div>
   );
 }

@@ -3,6 +3,13 @@
   <head>
     <meta charset="utf-8" />
     <style>
+      /* Saira ships with the extension so timers look the same as on the
+         dashboard (it is not installed on most computers). */
+      @font-face {
+        font-family: "Saira";
+        src: url("assets/saira.woff2") format("woff2");
+        font-weight: 100 900;
+      }
       :root {
         color-scheme: dark;
         --bg: #0a0a0a;
@@ -18,7 +25,7 @@
         --bad: #ff453a;
       }
       body {
-        width: 250px;
+        width: 260px;
         margin: 0;
         padding: 14px;
         background: var(--bg);
@@ -26,21 +33,28 @@
         font-family: -apple-system, "Segoe UI", Inter, system-ui, sans-serif;
         font-size: 13px;
       }
+      header {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      header img {
+        width: 22px;
+        height: 22px;
+        border-radius: 4px;
+      }
       h1 {
-        margin: 0 0 2px;
+        flex: 1;
+        margin: 0;
         font-size: 15px;
         font-weight: 600;
       }
-      p {
-        margin: 0;
-        color: var(--muted);
-        font-size: 12px;
-      }
-      .row {
+      .status {
         display: flex;
         align-items: center;
         gap: 6px;
-        margin-top: 8px;
+        color: var(--muted);
+        font-size: 12px;
       }
       .dot {
         width: 8px;
@@ -54,25 +68,33 @@
       .dot.warn {
         background: var(--warn);
       }
+      .session {
+        margin-top: 12px;
+        padding: 10px 12px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--surface);
+      }
+      .session[hidden] {
+        display: none;
+      }
       #session-time {
+        display: block;
         font-family: "Saira", -apple-system, "Segoe UI", sans-serif;
         font-weight: 600;
-        font-size: 22px;
+        font-size: 30px;
+        line-height: 1.1;
         font-variant-numeric: tabular-nums;
       }
-      input[type="url"] {
-        width: 100%;
-        box-sizing: border-box;
-        margin-top: 4px;
-        padding: 6px 8px;
-        border: 1px solid var(--line);
-        border-radius: 6px;
-        background: var(--bg);
-        color: var(--fg);
-        font: inherit;
+      #session-label {
+        color: var(--muted);
+      }
+      .idle {
+        margin: 12px 0 0;
+        color: var(--muted);
       }
       button {
-        padding: 6px 10px;
+        padding: 7px 10px;
         border: 1px solid var(--line);
         border-radius: 6px;
         background: var(--surface-2);
@@ -84,44 +106,104 @@
         border-color: var(--muted);
       }
       #open-dashboard {
-        margin-top: 8px;
+        margin-top: 12px;
         width: 100%;
         background: var(--accent);
         border-color: var(--accent);
         color: #000000;
+        font-weight: 500;
       }
       #open-dashboard:hover {
         background: var(--accent-ink);
       }
+      details {
+        margin-top: 12px;
+        border-top: 1px solid var(--line);
+        padding-top: 10px;
+      }
+      summary {
+        cursor: pointer;
+        color: var(--muted);
+        list-style: none;
+      }
+      summary::-webkit-details-marker {
+        display: none;
+      }
+      summary::before {
+        content: "";
+        display: inline-block;
+        width: 5px;
+        height: 5px;
+        margin: 0 8px 2px 1px;
+        border-right: 1.5px solid var(--muted);
+        border-bottom: 1.5px solid var(--muted);
+        transform: rotate(-45deg);
+        transition: transform 120ms;
+      }
+      details[open] summary::before {
+        transform: rotate(45deg);
+      }
+      label {
+        display: block;
+        margin-top: 10px;
+        color: var(--muted);
+      }
+      input[type="url"] {
+        width: 100%;
+        box-sizing: border-box;
+        margin-top: 4px;
+        padding: 7px 8px;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        background: var(--bg);
+        color: var(--fg);
+        font: inherit;
+      }
+      .row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-top: 8px;
+      }
       #save-note {
         min-height: 14px;
-        margin-top: 6px;
+        color: var(--muted);
       }
       #save-note.error {
         color: var(--bad);
       }
+      #version {
+        margin: 10px 0 0;
+        color: var(--muted);
+        font-size: 11px;
+      }
     </style>
   </head>
   <body>
-    <h1>LockedIn</h1>
-    <p id="version">v0.1.0</p>
-    <div class="row">
-      <span id="status-dot" class="dot ok" aria-hidden="true"></span>
-      <span id="status-text" role="status">Extension running</span>
-    </div>
-    <div class="row" id="session-box" hidden>
+    <header>
+      <img src="icons/icon-128.png" alt="" />
+      <h1>LockedIn</h1>
+      <span class="status">
+        <span id="status-dot" class="dot ok" aria-hidden="true"></span>
+        <span id="status-text" role="status">Running</span>
+      </span>
+    </header>
+    <div class="session" id="session-box" hidden>
       <span id="session-time" aria-live="polite">0:00</span>
-      <span id="session-label" style="color: var(--muted)"></span>
+      <span id="session-label"></span>
     </div>
-    <div class="row" style="margin-top: 12px">
-      <label for="dashboard-url" style="color: var(--muted)">Dashboard URL</label>
-    </div>
-    <input id="dashboard-url" type="url" placeholder="https://your-app.vercel.app" aria-label="Dashboard URL" />
-    <div class="row">
-      <button id="save-url" type="button">Save</button>
-      <span id="save-note" aria-live="polite"></span>
-    </div>
+    <p class="idle" id="idle-text">No session running.</p>
     <button id="open-dashboard" type="button">Open dashboard</button>
+    <details id="settings">
+      <summary>Settings</summary>
+      <label for="dashboard-url">Dashboard URL</label>
+      <input id="dashboard-url" type="url" placeholder="https://your-app.vercel.app" aria-label="Dashboard URL" />
+      <div class="row">
+        <button id="save-url" type="button">Save</button>
+        <span id="save-note" aria-live="polite"></span>
+      </div>
+      <p id="version">v0.1.0</p>
+    </details>
     <script src="popup.js"></script>
   </body>
 </html>

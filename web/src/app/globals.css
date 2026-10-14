@@ -48,6 +48,40 @@ body {
   outline-offset: 2px;
 }
 
+/* Styled native selects: our chevron instead of the browser's arrow. */
+.lockedin-select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%239b9b9b' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 6l4 4 4-4'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  background-size: 14px;
+}
+
+.lockedin-select option {
+  background: var(--surface-2);
+  color: var(--fg);
+}
+
+/* Row actions (UI polish, Oct 2026): on a mouse, a row's buttons show only
+   while the row is hovered or has keyboard focus, so a list reads as a list
+   and not as a wall of buttons. Touch screens always show them. */
+@media (hover: hover) and (pointer: fine) {
+  .lockedin-row .lockedin-on-hover {
+    opacity: 0;
+    transition: opacity 120ms ease-out;
+  }
+
+  .lockedin-row:hover .lockedin-on-hover,
+  .lockedin-row:focus-within .lockedin-on-hover {
+    opacity: 1;
+  }
+}
+
+/* A scroll box that still has content below fades its last rows out
+   instead of slicing a row in half. */
+@utility lockedin-fade-bottom {
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 40px), transparent);
+}
+
 /* Completion celebration (SPEC 8.10): one burst, then still. Confetti bits
    take --angle and --distance from inline styles on each span. */
 .lockedin-celebration {

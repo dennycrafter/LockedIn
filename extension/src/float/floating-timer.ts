@@ -51,13 +51,13 @@ export const STYLE = `
 .header .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #9b9b9b; }
 .digits {
   padding: 8px 12px 2px;
-  font-family: "Saira", -apple-system, "Segoe UI", Inter, system-ui, sans-serif;
+  font-family: "LockedIn Saira", "Saira", -apple-system, "Segoe UI", Inter, system-ui, sans-serif;
   font-size: 34px;
   font-weight: 600;
   letter-spacing: 0.02em;
 }
 .meta { padding: 0 12px 6px; }
-.pill { display: inline-block; border-radius: 9999px; padding: 1px 8px; font-size: 11px; }
+.pill { display: inline-block; border: 1px solid #2b2b2b; border-radius: 9999px; padding: 1px 8px; font-size: 11px; color: #9b9b9b; }
 .controls { display: flex; gap: 6px; padding: 4px 8px 8px; }
 .controls button {
   background: transparent;
@@ -94,10 +94,25 @@ export const STYLE = `
 .feedback { color: #f2d24b; font-size: 11px; padding: 0 12px 6px; display: none; }
 `;
 
-function lockPill(lockMode: ActiveSession["lockMode"]): { background: string; color: string } {
-  if (lockMode === "hard") return { background: "rgba(255,69,58,.18)", color: "#ff453a" };
-  if (lockMode === "soft") return { background: "rgba(242,210,75,.18)", color: "#f2d24b" };
-  return { background: "rgba(106,184,255,.18)", color: "#6ab8ff" };
+// Lock mode is a status, not an alert, so the pill stays neutral like the
+// dashboard's (colour is kept for things that need attention).
+const LOCK_TEXT: Record<ActiveSession["lockMode"], string> = { none: "No lock", soft: "Soft lock", hard: "Hard lock" };
+
+/** Load the bundled Saira into the page once so the shadow DOM digits can use it. */
+function loadDigitsFont(doc: Document): void {
+  try {
+    if (typeof FontFace === "undefined" || typeof chrome === "undefined" || !chrome.runtime?.getURL) return;
+    if ([...doc.fonts].some((face) => face.family.replace(/"/g, "") === "LockedIn Saira")) return;
+    const face = new FontFace("LockedIn Saira", `url(${chrome.runtime.getURL("assets/saira.woff2")})`, {
+      weight: "100 900",
+    });
+    void face
+      .load()
+      .then((loaded) => doc.fonts.add(loaded))
+      .catch(() => undefined);
+  } catch {
+    // Fonts are cosmetic: the timer falls back to the system font.
+  }
 }
 
 export function createFloatingTimer(
@@ -108,6 +123,7 @@ export function createFloatingTimer(
   host.id = "lockedin-float-host";
   host.style.cssText = "position:fixed;z-index:2147483647;pointer-events:none;";
   const shadow = host.attachShadow({ mode: "open" });
+  loadDigitsFont(doc);
   const style = doc.createElement("style");
   style.textContent = STYLE;
   shadow.appendChild(style);
@@ -254,10 +270,7 @@ export function createFloatingTimer(
         ? formatCountdown(Math.max(0, softUnlockAtMs - Date.now()))
         : formatCountdown(remainingMs(session, Date.now()));
       digits.classList.toggle("warn", paused || ending);
-      const colors = lockPill(session.lockMode);
-      pill.textContent = ending ? "ending" : session.lockMode;
-      pill.style.background = colors.background;
-      pill.style.color = colors.color;
+      pill.textContent = ending ? "Ending" : LOCK_TEXT[session.lockMode];
       pauseResume.textContent = paused ? "Resume" : "Pause";
       pauseResume.setAttribute("aria-label", paused ? "Resume the session" : "Pause the session");
     },

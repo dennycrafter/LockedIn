@@ -3,10 +3,15 @@
 // Profile menu (SPEC 10 top bar): Display name, Completion message, Helper
 // mode (SPEC 8.15) and the wind-down time target (SPEC 8.12) here; Lock is
 // the existing logout.
+// UI polish (Oct 2026): a round initial button on the right of the top bar,
+// text fields save when you leave them (no separate Save buttons), and the
+// choices use the shared segmented control.
 
 import { useEffect, useRef, useState } from "react";
 import type { CelebrationStyle, HelperMode, SettingsData } from "@/lib/dashboard-data";
 import { celebrationMessage } from "@/lib/celebration";
+import { initialOf } from "@/lib/ui-format";
+import { FIELD_LABEL, INPUT, Segmented } from "./ui";
 
 const STYLE_OPTIONS: Array<{ value: CelebrationStyle; label: string }> = [
   { value: "dramatic", label: "Dramatic" },
@@ -25,6 +30,8 @@ export function ProfileMenu({
   error,
   onSave,
   align = "right",
+  statusColor,
+  statusText,
 }: {
   settings: SettingsData;
   /** Server-computed Anthropic key presence (GET /api/settings); the toggle
@@ -39,6 +46,9 @@ export function ProfileMenu({
   }) => void;
   /** Which edge of the button the pop-up lines up with. */
   align?: "left" | "right";
+  /** Small dot on the circle: green when the extension answers, yellow when it does not. */
+  statusColor?: string;
+  statusText?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [nameDraft, setNameDraft] = useState(settings.display_name);
@@ -66,6 +76,20 @@ export function ProfileMenu({
     };
   }, [open]);
 
+  const saveName = () => {
+    const next = nameDraft.trim();
+    if (next === "") {
+      setNameDraft(settings.display_name);
+      return;
+    }
+    if (next !== settings.display_name) onSave({ display_name: next });
+  };
+
+  const saveTime = () => {
+    const next = timeDraft.trim();
+    if (next !== settings.wind_down_time) onSave({ wind_down_time: next });
+  };
+
   return (
     <div ref={menuRef} className="relative">
       <button
@@ -73,137 +97,107 @@ export function ProfileMenu({
         onClick={() => setOpen((prev) => !prev)}
         aria-expanded={open}
         aria-haspopup="true"
-        className="rounded-md border border-[var(--line)] px-3 py-1.5 text-sm text-[var(--muted)] hover:border-[var(--muted)] hover:text-[var(--fg)]"
+        aria-label="Profile"
+        title={statusText ? `Profile. ${statusText}` : "Profile"}
+        className="relative inline-flex h-9 w-9 items-center justify-center rounded-full border border-[var(--line)] bg-[var(--surface-2)] text-sm font-semibold text-[var(--fg)] transition-colors hover:border-[var(--muted)]"
       >
-        Profile
+        {initialOf(settings.display_name)}
+        {statusColor && (
+          <span
+            aria-hidden
+            className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-[var(--bg)]"
+            style={{ background: statusColor }}
+          />
+        )}
       </button>
 
       {open && (
-        <div className={`absolute ${align === "left" ? "left-0" : "right-0"} top-full z-30 mt-2 w-72 rounded-lg border border-[var(--line)] bg-[var(--surface-2)] p-4 shadow-[0_6px_16px_rgba(0,0,0,0.3)]`}>
-          <form
-            className="space-y-3"
-            onSubmit={(event) => {
-              event.preventDefault();
-              const next = nameDraft.trim();
-              if (next && next !== settings.display_name) onSave({ display_name: next });
+        <div
+          className={`absolute ${align === "left" ? "left-0" : "right-0"} top-full z-30 mt-2 w-[min(19rem,calc(100vw-32px))] rounded-lg border border-[var(--line)] bg-[var(--surface-2)] p-4 shadow-[0_6px_16px_rgba(0,0,0,0.3)]`}
+        >
+          {statusText && (
+            <p className="mb-3 flex items-center gap-2 border-b border-[var(--line)] pb-3 text-[13px] text-[var(--muted)]">
+              <span aria-hidden className="h-2 w-2 rounded-full" style={{ background: statusColor }} />
+              {statusText}
+            </p>
+          )}
+
+          <label className={FIELD_LABEL} htmlFor="profile-display-name">
+            Display name
+          </label>
+          <input
+            id="profile-display-name"
+            type="text"
+            value={nameDraft}
+            onChange={(event) => setNameDraft(event.target.value)}
+            onBlur={saveName}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") event.currentTarget.blur();
             }}
-          >
-            <label className="block text-sm">
-              <span className="text-[var(--muted)]">Display name</span>
-              <input
-                type="text"
-                value={nameDraft}
-                onChange={(event) => setNameDraft(event.target.value)}
-                placeholder="Your work self nickname"
-                aria-label="Display name"
-                className="mt-1 w-full rounded-md border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--fg)] placeholder:text-[var(--muted)]"
-              />
-            </label>
-            <button
-              type="submit"
-              disabled={nameDraft.trim() === "" || nameDraft.trim() === settings.display_name}
-              className="w-full rounded-md border border-[var(--line)] px-3 py-1.5 text-sm text-[var(--fg)] hover:border-[var(--muted)] disabled:opacity-50"
-            >
-              Save name
-            </button>
-          </form>
+            placeholder="Your work self nickname"
+            aria-label="Display name"
+            className={INPUT}
+          />
 
           <fieldset className="mt-4">
-            <legend className="text-sm text-[var(--muted)]">Completion message</legend>
-            <div className="mt-1 flex flex-wrap gap-2">
-              {STYLE_OPTIONS.map((option) => (
-                <button
-                  key={option.value}
-                  type="button"
-                  onClick={() => {
-                    if (option.value !== settings.completion_style) onSave({ completion_style: option.value });
-                  }}
-                  aria-pressed={settings.completion_style === option.value}
-                  className="rounded-md border px-3 py-1.5 text-sm"
-                  style={
-                    settings.completion_style === option.value
-                      ? { borderColor: "var(--muted)", color: "var(--fg)" }
-                      : { borderColor: "var(--line)", color: "var(--fg)" }
-                  }
-                >
-                  {option.label}
-                </button>
-              ))}
-            </div>
-            <p className="mt-2 text-xs text-[var(--muted)]">
+            <legend className={FIELD_LABEL}>Completion message</legend>
+            <Segmented
+              label="Completion message"
+              className="flex w-full"
+              value={settings.completion_style}
+              onChange={(value) => onSave({ completion_style: value })}
+              options={STYLE_OPTIONS}
+            />
+            <p className="mt-2 text-[13px] text-[var(--muted)]">
               {celebrationMessage(settings.completion_style, settings.display_name)}
             </p>
           </fieldset>
 
           <fieldset className="mt-4">
-            <legend className="text-sm text-[var(--muted)]">Helper mode</legend>
-            <div className="mt-1 flex flex-wrap gap-2">
-              {HELPER_MODE_OPTIONS.map((option) => {
-                // SPEC 8.15: AI needs the Anthropic key configured in Vercel;
-                // without it the button is disabled with the hint below.
-                const disabled = option.value === "ai" && !aiAvailable;
-                return (
-                  <button
-                    key={option.value}
-                    type="button"
-                    onClick={() => {
-                      if (option.value !== settings.helper_mode) onSave({ helper_mode: option.value });
-                    }}
-                    disabled={disabled}
-                    aria-pressed={settings.helper_mode === option.value}
-                    className="rounded-md border px-3 py-1.5 text-sm disabled:opacity-50"
-                    style={
-                      settings.helper_mode === option.value
-                        ? { borderColor: "var(--muted)", color: "var(--fg)" }
-                        : { borderColor: "var(--line)", color: "var(--fg)" }
-                    }
-                  >
-                    {option.label}
-                  </button>
-                );
-              })}
-            </div>
+            <legend className={FIELD_LABEL}>Helper mode</legend>
+            {/* SPEC 8.15: AI needs the Anthropic key configured in Vercel;
+                without it the button is disabled with the hint below. */}
+            <Segmented
+              label="Helper mode"
+              className="flex w-full"
+              value={settings.helper_mode}
+              onChange={(value) => onSave({ helper_mode: value })}
+              options={HELPER_MODE_OPTIONS.map((option) => ({
+                ...option,
+                disabled: option.value === "ai" && !aiAvailable,
+              }))}
+            />
             {!aiAvailable && (
-              <p className="mt-2 text-xs text-[var(--muted)]">Add your Anthropic key in Vercel to turn this on</p>
+              <p className="mt-2 text-[13px] text-[var(--muted)]">Add your Anthropic key in Vercel to turn this on</p>
             )}
           </fieldset>
 
-          <form
-            className="mt-4 border-t border-[var(--line)] pt-3"
-            onSubmit={(event) => {
-              event.preventDefault();
-              const next = timeDraft.trim();
-              if (next !== settings.wind_down_time) onSave({ wind_down_time: next });
+          <label className={`${FIELD_LABEL} mt-4`} htmlFor="profile-wind-down-time">
+            Wind down time
+          </label>
+          <input
+            id="profile-wind-down-time"
+            type="text"
+            value={timeDraft}
+            onChange={(event) => setTimeDraft(event.target.value)}
+            onBlur={saveTime}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") event.currentTarget.blur();
             }}
-          >
-            <label className="block text-sm">
-              <span className="text-[var(--muted)]">Wind down time</span>
-              <input
-                type="text"
-                value={timeDraft}
-                onChange={(event) => setTimeDraft(event.target.value)}
-                placeholder="21:30"
-                aria-label="Wind down time"
-                className="mt-1 w-full rounded-md border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--fg)] placeholder:text-[var(--muted)]"
-              />
-            </label>
-            <button
-              type="submit"
-              disabled={timeDraft.trim() === settings.wind_down_time}
-              className="mt-2 w-full rounded-md border border-[var(--line)] px-3 py-1.5 text-sm text-[var(--fg)] hover:border-[var(--muted)] disabled:opacity-50"
-            >
-              Save wind down time
-            </button>
-          </form>
+            placeholder="21:30"
+            aria-label="Wind down time"
+            className={INPUT}
+          />
+          <p className="mt-1.5 text-xs text-[var(--muted)]">Fields save when you leave them.</p>
 
-          {error && <p className="mt-3 text-sm text-[var(--bad)]">{error}</p>}
+          {error && <p className="mt-3 text-[13px] text-[var(--bad)]">{error}</p>}
 
           <form action="/api/logout" method="post" className="mt-4 border-t border-[var(--line)] pt-3">
             <button
               type="submit"
-              className="w-full rounded-md border border-[var(--line)] px-3 py-1.5 text-sm text-[var(--muted)] hover:border-[var(--muted)] hover:text-[var(--fg)]"
+              className="w-full rounded-md px-3 py-1.5 text-left text-sm text-[var(--muted)] hover:bg-[var(--line)] hover:text-[var(--fg)]"
             >
-              Lock
+              Lock dashboard (log out)
             </button>
           </form>
         </div>

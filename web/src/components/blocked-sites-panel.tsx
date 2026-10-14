@@ -5,6 +5,8 @@
 // to the extension through the bridge by the parent.
 import { useState } from "react";
 import type { BlockedSiteData } from "@/lib/dashboard-data";
+import { PlusIcon, TrashIcon } from "./icons";
+import { BTN_ICON, BTN_QUIET, BTN_SECONDARY, INPUT_BOX } from "./ui";
 
 export function BlockedSitesPanel({
   sites,
@@ -30,7 +32,7 @@ export function BlockedSitesPanel({
       className={bare ? "" : "rounded-lg border border-[var(--line)] bg-[var(--surface)] p-4"}
     >
       {!bare && <h2 className="text-base font-semibold text-[var(--fg)]">Edit blocked sites</h2>}
-      <p className={`${bare ? "" : "mt-1 "}text-xs text-[var(--muted)]`}>
+      <p className={`${bare ? "" : "mt-1 "}text-[13px] text-[var(--muted)]`}>
         Full URL or bare domain. Blocking covers the domain and all subdomains.
       </p>
 
@@ -49,14 +51,11 @@ export function BlockedSitesPanel({
           type="text"
           value={draft}
           onChange={(event) => setDraft(event.target.value)}
-          placeholder="youtube.com"
+          placeholder="e.g. youtube.com"
           aria-label="Site to block"
-          className="min-w-0 flex-1 rounded-md border border-[var(--line)] bg-[var(--bg)] px-3 py-1.5 text-sm text-[var(--fg)] placeholder:text-[var(--muted)]"
+          className={`${INPUT_BOX} flex-1`}
         />
-        <button
-          type="submit"
-          className="rounded-md border border-[var(--line)] px-3 py-1.5 text-sm text-[var(--fg)] hover:border-[var(--muted)]"
-        >
+        <button type="submit" disabled={draft.trim() === ""} className={BTN_SECONDARY}>
           Add
         </button>
       </form>
@@ -64,9 +63,10 @@ export function BlockedSitesPanel({
       <button
         type="button"
         onClick={onAddSocialPack}
-        className="mt-2 rounded-md border border-[var(--line)] px-3 py-1.5 text-sm text-[var(--fg)] hover:border-[var(--muted)]"
+        className={`${BTN_QUIET} -ml-2 mt-1`}
       >
-        Social media pack
+        <PlusIcon size={14} />
+        Add the social media pack
       </button>
 
       {error && <p className="mt-2 text-sm text-[var(--bad)]">{error}</p>}
@@ -74,17 +74,21 @@ export function BlockedSitesPanel({
       {sites.length === 0 ? (
         <p className="mt-3 text-sm text-[var(--muted)]">Nothing blocked yet.</p>
       ) : (
-        <ul className="mt-3">
+        <ul className="mt-3 overflow-hidden rounded-md border border-[var(--line)]">
           {sites.map((site) => (
-            <li key={site.id} className="flex items-center justify-between border-b border-[var(--line)] py-2 last:border-b-0">
+            <li
+              key={site.id}
+              className="lockedin-row flex items-center justify-between gap-2 border-b border-[var(--line)] py-1 pl-3 pr-1 last:border-b-0"
+            >
               <span className="truncate text-sm text-[var(--fg)]">{site.domain}</span>
               <button
                 type="button"
                 onClick={() => onDelete(site.id)}
                 aria-label={`Stop blocking ${site.domain}`}
-                className="text-xs text-[var(--muted)] hover:text-[var(--bad)]"
+                title="Stop blocking"
+                className={`${BTN_ICON} lockedin-on-hover hover:text-[var(--bad)]`}
               >
-                Remove
+                <TrashIcon size={14} />
               </button>
             </li>
           ))}

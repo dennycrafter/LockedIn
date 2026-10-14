@@ -4,6 +4,11 @@
     <meta charset="utf-8" />
     <title>Blocked</title>
     <style>
+      @font-face {
+        font-family: "Saira";
+        src: url("assets/saira.woff2") format("woff2");
+        font-weight: 100 900;
+      }
       :root {
         color-scheme: dark;
         --bg: #0a0a0a;
@@ -73,6 +78,30 @@
         font-size: 15px;
         word-break: break-all;
       }
+      #task {
+        margin: -12px 0 24px;
+        color: var(--fg);
+        font-size: 15px;
+      }
+      #task[hidden] {
+        display: none;
+      }
+      .brand {
+        position: fixed;
+        left: 24px;
+        top: 20px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        color: var(--muted);
+        font-size: 14px;
+        font-weight: 600;
+      }
+      .brand img {
+        width: 22px;
+        height: 22px;
+        border-radius: 4px;
+      }
       #time-left {
         display: block;
         margin-bottom: 28px;
@@ -97,10 +126,12 @@
     </style>
   </head>
   <body>
+    <div class="brand"><img src="icons/icon-128.png" alt="" />LockedIn</div>
     <main>
       <div class="lock" aria-hidden="true"></div>
       <h1>Blocked. Back to work.</h1>
       <p id="site">this site</p>
+      <p id="task" hidden></p>
       <span id="time-left" aria-live="polite">0:00</span>
       <button id="back-to-task" type="button">Back to my task</button>
     </main>

@@ -137,7 +137,7 @@ export function AiChatPanel({
         {entries.length === 0 && <li className="px-3 py-3 text-sm text-[var(--muted)]">{introText}</li>}
         {entries.map((entry) => (
           <li key={entry.id} className="border-b border-[var(--line)] px-3 py-2 last:border-b-0">
-            <span className="block text-[10px] uppercase tracking-wide text-[var(--muted)]">
+            <span className="block text-[11px] uppercase tracking-wide text-[var(--muted)]">
               {entry.role === "user" ? "You" : "AI coach"}
             </span>
             {entry.content !== "" && <p className="whitespace-pre-wrap text-sm text-[var(--fg)]">{entry.content}</p>}

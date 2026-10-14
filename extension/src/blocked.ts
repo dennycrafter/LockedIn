@@ -32,6 +32,11 @@ async function showTimeLeft(): Promise<void> {
   const el = document.getElementById("time-left");
   if (!el) return;
   const session = await getActiveSession();
+  const taskEl = document.getElementById("task");
+  if (taskEl) {
+    taskEl.hidden = !session?.label;
+    taskEl.textContent = session?.label ? `You are on: ${session.label}` : "";
+  }
   if (!session || session.pausedAtMs !== null) {
     el.textContent = session ? "paused" : "0:00";
     return;

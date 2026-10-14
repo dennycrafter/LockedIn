@@ -2,10 +2,16 @@
 
 // Projects panel (T2, SPEC 8.2, 8.3, 8.7): the full three-level tree.
 // Drag reorder via @dnd-kit at three scopes (projects, tasks in a project,
-// subtasks in a task), rename inline, tick, delete with confirm on projects,
-// links modal per item, item notes with dated snippets, progress rings.
+// subtasks in a task), rename inline, tick, delete with undo, links modal per
+// item, item notes with dated snippets, progress rings.
+//
+// UI polish (Oct 2026): rows read as a list, not a wall of buttons. Each row
+// keeps its checkbox and title; links and notes show as small indicators
+// only when they exist; Start and the "more" menu (Links, Notes, Add
+// subtask, Delete) appear on hover or keyboard focus (always on touch).
+// Finished items hide behind "Show N done" per project.
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   DndContext,
   KeyboardSensor,
@@ -26,11 +32,14 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import type { ProjectData, TaskData } from "@/lib/dashboard-data";
 import { applyReorder } from "@/lib/reorder";
-import { projectProgress } from "@/lib/tree";
+import { projectItems, projectProgress } from "@/lib/tree";
 import { EditableTitle } from "./editable-title";
+import { ChevronIcon, GripIcon, LinkIcon, NoteIcon, PlayIcon, PlusIcon } from "./icons";
 import { ItemNotes } from "./item-notes";
 import { LinksModal } from "./links-modal";
+import { Modal } from "./modal";
 import { ProgressRing } from "./progress-ring";
+import { BTN_ICON, BTN_PRIMARY, BTN_QUIET, CARD, CARD_TITLE, FIELD_LABEL, INPUT, RowMenu } from "./ui";
 
 export type LinkOwner = { ownerType: "project" | "task"; ownerId: string; label: string };
 
@@ -51,18 +60,20 @@ export interface ProjectsPanelHandlers {
   onDeleteLink: (linkId: string) => void;
 }
 
-const HANDLE_CLASS = "cursor-grab select-none touch-none inline-flex h-6 w-6 items-center justify-center text-[var(--muted)] hover:text-[var(--fg)]";
-// Rows wrap on narrow screens: the title keeps at least 9rem and the actions
-// drop to their own line on the right instead of squeezing the title.
-const ROW_CLASS = "flex flex-wrap items-center gap-x-2 gap-y-1 px-3 py-2";
-const TITLE_SLOT = "flex min-w-[9rem] flex-1";
-const ACTIONS = "ml-auto flex shrink-0 items-center gap-2";
-const ICON_BUTTON = "inline-flex h-6 min-w-6 shrink-0 items-center justify-center gap-0.5 px-1 text-xs text-[var(--muted)] hover:text-[var(--fg)]";
+const HANDLE_CLASS =
+  "lockedin-on-hover inline-flex h-8 w-5 shrink-0 cursor-grab select-none touch-none items-center justify-center rounded text-[var(--muted)] hover:text-[var(--fg)]";
+const ROW_CLASS = "lockedin-row flex items-center gap-1.5 rounded-md hover:bg-[color-mix(in_srgb,var(--surface-2)_60%,transparent)] sm:gap-2";
+const INDICATOR =
+  "inline-flex h-8 shrink-0 items-center gap-1 rounded-md px-1.5 text-xs tabular-nums text-[var(--muted)] hover:bg-[var(--surface-2)] hover:text-[var(--fg)]";
+const QUIET_INPUT =
+  "min-w-0 flex-1 rounded-md border border-transparent bg-transparent px-2 py-1.5 text-[13px] text-[var(--fg)] placeholder:text-[var(--muted)] hover:border-[var(--line)] focus:border-[var(--line)] focus:bg-[var(--bg)] focus:outline-none";
+const CHECKBOX = "h-4 w-4 shrink-0 accent-[var(--silver)]";
 const COLLAPSED_KEY = "lockedin-collapsed-projects";
+const SHOW_DONE_KEY = "lockedin-show-done-projects";
 
-function readCollapsedProjects(): string[] {
+function readIds(key: string): string[] {
   try {
-    const raw = window.localStorage.getItem(COLLAPSED_KEY);
+    const raw = window.localStorage.getItem(key);
     const parsed: unknown = raw === null ? [] : JSON.parse(raw);
     return Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === "string") : [];
   } catch {
@@ -70,11 +81,11 @@ function readCollapsedProjects(): string[] {
   }
 }
 
-function persistCollapsedProjects(ids: string[]) {
+function persistIds(key: string, ids: string[]) {
   try {
-    window.localStorage.setItem(COLLAPSED_KEY, JSON.stringify(ids));
+    window.localStorage.setItem(key, JSON.stringify(ids));
   } catch {
-    // Private mode or storage full: collapse state just does not persist.
+    // Private mode or storage full: the choice just does not persist.
   }
 }
 
@@ -84,6 +95,7 @@ function sortableStyle(transform: never, transition: string | undefined, isDragg
     transition,
     zIndex: isDragging ? 10 : undefined,
     background: isDragging ? "var(--surface-2)" : undefined,
+    position: isDragging ? "relative" : undefined,
   };
 }
 
@@ -106,10 +118,42 @@ function DragHandle({
       {...attributes}
       {...listeners}
       aria-label={label}
+      title="Drag to reorder"
       className={HANDLE_CLASS}
     >
-      ⠿
+      <GripIcon size={14} />
     </button>
+  );
+}
+
+/** Links count and a notes mark: shown only when there is something to show. */
+function Indicators({
+  links,
+  hasNotes,
+  label,
+  onOpenLinks,
+  onOpenNotes,
+}: {
+  links: number;
+  hasNotes: boolean;
+  label: string;
+  onOpenLinks: () => void;
+  onOpenNotes: () => void;
+}) {
+  return (
+    <>
+      {links > 0 && (
+        <button type="button" onClick={onOpenLinks} aria-label={`Links on ${label} (${links})`} title="Links" className={INDICATOR}>
+          <LinkIcon size={14} />
+          {links}
+        </button>
+      )}
+      {hasNotes && (
+        <button type="button" onClick={onOpenNotes} aria-label={`Notes on ${label}`} title="Notes" className={INDICATOR}>
+          <NoteIcon size={14} />
+        </button>
+      )}
+    </>
   );
 }
 
@@ -120,56 +164,34 @@ interface RowProps {
   onOpenLinks: (owner: LinkOwner) => void;
   /** A session is running, so the SPEC 8.4 one-session rule disables its timer button. */
   sessionActive: boolean;
+  /** Finished items stay mounted (drag order needs them) but hide until "Show done". */
+  showDone: boolean;
 }
 
-function TaskRow({ task, depth, handlers, onOpenLinks, sessionActive }: RowProps) {
+function TaskRow({ task, depth, handlers, onOpenLinks, sessionActive, showDone }: RowProps) {
   const { setNodeRef, setActivatorNodeRef, attributes, listeners, transform, transition, isDragging } =
     useSortable({ id: task.id });
   const [notesOpen, setNotesOpen] = useState(false);
+  const [notesFromMenu, setNotesFromMenu] = useState(false);
+  const [addingSubtask, setAddingSubtask] = useState(false);
   const [subtaskDraft, setSubtaskDraft] = useState("");
+  const subtaskInputRef = useRef<HTMLInputElement>(null);
 
-  const subtasks =
-    depth === "task" ? (
-      <div className="pb-2 pl-8">
-        <SubtaskDnd task={task} handlers={handlers} onOpenLinks={onOpenLinks} sessionActive={sessionActive} />
-        <form
-          className="mt-1 flex gap-2"
-          onSubmit={(event) => {
-            event.preventDefault();
-            const title = subtaskDraft.trim();
-            if (title) {
-              handlers.onCreateTask(task.project_id, task.id, title);
-              setSubtaskDraft("");
-            }
-          }}
-        >
-          <input
-            type="text"
-            value={subtaskDraft}
-            onChange={(event) => setSubtaskDraft(event.target.value)}
-            placeholder="+ Add subtask"
-            aria-label={`New subtask in ${task.title}`}
-            className="min-w-0 flex-1 rounded-md border border-transparent bg-transparent px-3 py-1 text-xs text-[var(--fg)] placeholder:text-[var(--muted)] hover:border-[var(--line)] focus:border-[var(--line)] focus:bg-[var(--bg)]"
-          />
-          {/* Quiet line until something is typed; Enter also adds. */}
-          <button
-            type="submit"
-            hidden={subtaskDraft.trim() === ""}
-            className="rounded-md border border-[var(--line)] px-2 py-1 text-xs text-[var(--fg)] hover:border-[var(--muted)] disabled:opacity-50"
-          >
-            Add
-          </button>
-        </form>
-      </div>
-    ) : null;
+  useEffect(() => {
+    if (addingSubtask) subtaskInputRef.current?.focus();
+  }, [addingSubtask]);
+
+  const openNotes = (fromMenu: boolean) => {
+    setNotesFromMenu(fromMenu && task.notes.trim() === "");
+    setNotesOpen((prev) => (fromMenu ? true : !prev));
+  };
+
+  const hidden = task.done && !showDone;
+  const openLinks = () => onOpenLinks({ ownerType: "task", ownerId: task.id, label: task.title });
 
   return (
-    <li
-      ref={setNodeRef}
-      style={sortableStyle(transform as never, transition, isDragging)}
-      className="border-b border-[var(--line)] last:border-b-0"
-    >
-      <div className={`${ROW_CLASS} ${depth === "subtask" ? "pl-8" : ""}`}>
+    <li ref={setNodeRef} style={sortableStyle(transform as never, transition, isDragging)} hidden={hidden}>
+      <div className={`${ROW_CLASS} py-1 pl-0.5 pr-1`}>
         <DragHandle
           activatorRef={setActivatorNodeRef}
           attributes={attributes}
@@ -181,9 +203,9 @@ function TaskRow({ task, depth, handlers, onOpenLinks, sessionActive }: RowProps
           checked={task.done}
           onChange={(event) => handlers.onToggleTask(task.id, event.target.checked)}
           aria-label={task.done ? `Mark ${task.title} not done` : `Mark ${task.title} done`}
-          className="h-4 w-4 accent-[var(--silver)]"
+          className={CHECKBOX}
         />
-        <div className={TITLE_SLOT}>
+        <div className="flex min-w-0 flex-1 pl-1">
           <EditableTitle
             title={task.title}
             onRename={(title) => handlers.onRenameTask(task.id, title)}
@@ -191,59 +213,92 @@ function TaskRow({ task, depth, handlers, onOpenLinks, sessionActive }: RowProps
             className={`text-sm ${task.done ? "text-[var(--muted)] line-through" : "text-[var(--fg)]"}`}
           />
         </div>
-        <div className={ACTIONS}>
-        <button
-          type="button"
-          onClick={() => onOpenLinks({ ownerType: "task", ownerId: task.id, label: task.title })}
-          aria-label={`Links on ${task.title}`}
-          title="Links"
-          className={ICON_BUTTON}
-        >
-          ↗ {task.links.length > 0 ? task.links.length : ""}
-        </button>
-        <button
-          type="button"
-          onClick={() => setNotesOpen((prev) => !prev)}
-          aria-label={`Notes on ${task.title}`}
-          aria-expanded={notesOpen}
-          title="Notes"
-          className={ICON_BUTTON}
-        >
-          ✎
-        </button>
-        <button
-          type="button"
-          onClick={() => handlers.onStartTask(task.id)}
-          disabled={sessionActive}
-          aria-label={`Start a session on ${task.title}`}
-          title={sessionActive ? "A session is already running" : "Start a session on this item"}
-          className={`${ICON_BUTTON} disabled:cursor-not-allowed disabled:opacity-40`}
-        >
-          ▶
-        </button>
-        <button
-          type="button"
-          onClick={() => handlers.onDeleteTask(task.id)}
-          aria-label={`Delete ${task.title}`}
-          className={`${ICON_BUTTON} hover:text-[var(--bad)]`}
-        >
-          Delete
-        </button>
-        </div>
+        <Indicators
+          links={task.links.length}
+          hasNotes={task.notes.trim() !== "" || task.snippets.length > 0}
+          label={task.title}
+          onOpenLinks={openLinks}
+          onOpenNotes={() => openNotes(false)}
+        />
+        {!task.done && (
+          <button
+            type="button"
+            onClick={() => handlers.onStartTask(task.id)}
+            disabled={sessionActive}
+            aria-label={`Start a session on ${task.title}`}
+            title={sessionActive ? "A session is already running" : "Start a session on this item"}
+            className={`${BTN_ICON} lockedin-on-hover`}
+          >
+            <PlayIcon size={14} />
+          </button>
+        )}
+        <RowMenu
+          className="lockedin-on-hover"
+          label={`More actions for ${task.title}`}
+          items={[
+            { label: "Links", onSelect: openLinks },
+            { label: "Notes", onSelect: () => openNotes(true) },
+            ...(depth === "task" ? [{ label: "Add subtask", onSelect: () => setAddingSubtask(true) }] : []),
+            { label: "Delete", danger: true, onSelect: () => handlers.onDeleteTask(task.id) },
+          ]}
+        />
       </div>
 
       {notesOpen && (
-        <div className="px-3 pb-2 pl-9">
+        <div className="pb-2 pl-12 pr-2">
           <ItemNotes
             notes={task.notes}
             snippets={task.snippets}
             ownerLabel={task.title}
+            startEditing={notesFromMenu}
             onSave={(notes) => handlers.onUpdateTaskNotes(task.id, notes)}
           />
         </div>
       )}
 
-      {subtasks}
+      {depth === "task" && (task.subtasks.length > 0 || addingSubtask) && (
+        <div className="pl-4 sm:pl-7">
+          <SubtaskDnd
+            task={task}
+            handlers={handlers}
+            onOpenLinks={onOpenLinks}
+            sessionActive={sessionActive}
+            showDone={showDone}
+          />
+          {addingSubtask && (
+            <form
+              className="flex gap-2 py-1 pl-6 pr-1 sm:pl-7"
+              onSubmit={(event) => {
+                event.preventDefault();
+                const title = subtaskDraft.trim();
+                if (title) {
+                  handlers.onCreateTask(task.project_id, task.id, title);
+                  setSubtaskDraft("");
+                }
+              }}
+            >
+              <input
+                ref={subtaskInputRef}
+                type="text"
+                value={subtaskDraft}
+                onChange={(event) => setSubtaskDraft(event.target.value)}
+                onBlur={() => {
+                  if (subtaskDraft.trim() === "") setAddingSubtask(false);
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === "Escape") {
+                    setSubtaskDraft("");
+                    setAddingSubtask(false);
+                  }
+                }}
+                placeholder="New subtask, Enter to add"
+                aria-label={`New subtask in ${task.title}`}
+                className={QUIET_INPUT}
+              />
+            </form>
+          )}
+        </div>
+      )}
     </li>
   );
 }
@@ -254,11 +309,13 @@ function SubtaskDnd({
   handlers,
   onOpenLinks,
   sessionActive,
+  showDone,
 }: {
   task: TaskData;
   handlers: ProjectsPanelHandlers;
   onOpenLinks: (owner: LinkOwner) => void;
   sessionActive: boolean;
+  showDone: boolean;
 }) {
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
@@ -288,6 +345,7 @@ function SubtaskDnd({
               handlers={handlers}
               onOpenLinks={onOpenLinks}
               sessionActive={sessionActive}
+              showDone={showDone}
             />
           ))}
         </ul>
@@ -302,11 +360,13 @@ function TaskDnd({
   handlers,
   onOpenLinks,
   sessionActive,
+  showDone,
 }: {
   project: ProjectData;
   handlers: ProjectsPanelHandlers;
   onOpenLinks: (owner: LinkOwner) => void;
   sessionActive: boolean;
+  showDone: boolean;
 }) {
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
@@ -322,9 +382,7 @@ function TaskDnd({
     handlers.onReorder("tasks", next);
   }
 
-  if (project.tasks.length === 0) {
-    return <p className="px-3 py-2 text-sm text-[var(--muted)]">No tasks yet.</p>;
-  }
+  if (project.tasks.length === 0) return null;
 
   return (
     <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
@@ -338,6 +396,7 @@ function TaskDnd({
               handlers={handlers}
               onOpenLinks={onOpenLinks}
               sessionActive={sessionActive}
+              showDone={showDone}
             />
           ))}
         </ul>
@@ -350,6 +409,8 @@ function ProjectBlock({
   project,
   collapsed,
   onToggleCollapsed,
+  showDone,
+  onToggleShowDone,
   handlers,
   onOpenLinks,
   sessionActive,
@@ -357,6 +418,8 @@ function ProjectBlock({
   project: ProjectData;
   collapsed: boolean;
   onToggleCollapsed: () => void;
+  showDone: boolean;
+  onToggleShowDone: () => void;
   handlers: ProjectsPanelHandlers;
   onOpenLinks: (owner: LinkOwner) => void;
   sessionActive: boolean;
@@ -364,16 +427,23 @@ function ProjectBlock({
   const { setNodeRef, setActivatorNodeRef, attributes, listeners, transform, transition, isDragging } =
     useSortable({ id: project.id });
   const progress = projectProgress(project);
+  const doneCount = projectItems(project).filter((item) => item.done).length;
   const [taskDraft, setTaskDraft] = useState("");
   const [notesOpen, setNotesOpen] = useState(false);
+  const [notesFromMenu, setNotesFromMenu] = useState(false);
+  const openLinks = () => onOpenLinks({ ownerType: "project", ownerId: project.id, label: project.name });
+  const openNotes = (fromMenu: boolean) => {
+    setNotesFromMenu(fromMenu && project.notes.trim() === "");
+    setNotesOpen((prev) => (fromMenu ? true : !prev));
+  };
 
   return (
     <div
       ref={setNodeRef}
       style={sortableStyle(transform as never, transition, isDragging)}
-      className="rounded-md border border-[var(--line)]"
+      className="rounded-md border border-[var(--line)] bg-[var(--surface)]"
     >
-      <div className={ROW_CLASS}>
+      <div className={`${ROW_CLASS} rounded-b-none py-1.5 pl-1.5 pr-3 sm:pl-2`}>
         <DragHandle
           activatorRef={setActivatorNodeRef}
           attributes={attributes}
@@ -385,105 +455,101 @@ function ProjectBlock({
           onClick={onToggleCollapsed}
           aria-label={collapsed ? `Expand ${project.name}` : `Collapse ${project.name}`}
           aria-expanded={!collapsed}
-          className="inline-flex h-6 w-6 items-center justify-center text-[var(--muted)] hover:text-[var(--fg)]"
+          className="-ml-1 inline-flex h-8 w-6 shrink-0 items-center justify-center rounded text-[var(--muted)] hover:text-[var(--fg)]"
         >
-          {collapsed ? ">" : "v"}
+          <ChevronIcon size={14} className={`transition-transform ${collapsed ? "" : "rotate-90"}`} />
         </button>
-        <div className={TITLE_SLOT}>
+        <div className="flex min-w-0 flex-1">
           <EditableTitle
             title={project.name}
             onRename={(name) => handlers.onRenameProject(project.id, name)}
             label={project.name}
-            className="text-sm font-medium"
+            className="text-[15px] font-semibold text-[var(--fg)]"
           />
         </div>
-        <div className={ACTIONS}>
-        <ProgressRing percent={progress.percent} label={project.name} />
+        <Indicators
+          links={project.links.length}
+          hasNotes={project.notes.trim() !== "" || project.snippets.length > 0}
+          label={project.name}
+          onOpenLinks={openLinks}
+          onOpenNotes={() => openNotes(false)}
+        />
+        <ProgressRing percent={progress.percent} done={progress.done} total={progress.total} label={project.name} />
         <button
           type="button"
           onClick={() => handlers.onStartProject(project.id)}
           disabled={sessionActive}
           aria-label={`Start a session on ${project.name}`}
           title={sessionActive ? "A session is already running" : "Start a session on this project"}
-          className={`${ICON_BUTTON} disabled:cursor-not-allowed disabled:opacity-40`}
+          className={`${BTN_ICON} lockedin-on-hover max-sm:hidden`}
         >
-          ▶
+          <PlayIcon size={14} />
         </button>
-        <button
-          type="button"
-          onClick={() => onOpenLinks({ ownerType: "project", ownerId: project.id, label: project.name })}
-          aria-label={`Links on ${project.name}`}
-          title="Links"
-          className={ICON_BUTTON}
-        >
-          ↗ {project.links.length > 0 ? project.links.length : ""}
-        </button>
-        <button
-          type="button"
-          onClick={() => setNotesOpen((prev) => !prev)}
-          aria-label={`Notes on ${project.name}`}
-          aria-expanded={notesOpen}
-          title="Project notes"
-          className={ICON_BUTTON}
-        >
-          ✎
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            if (window.confirm(`Delete project "${project.name}" and all of its tasks?`)) {
-              handlers.onDeleteProject(project.id);
-            }
-          }}
-          aria-label={`Delete project ${project.name}`}
-          className={`${ICON_BUTTON} hover:text-[var(--bad)]`}
-        >
-          Delete
-        </button>
-        </div>
+        <RowMenu
+          className="lockedin-on-hover"
+          label={`More actions for ${project.name}`}
+          items={[
+            { label: "Links", onSelect: openLinks },
+            { label: "Project notes", onSelect: () => openNotes(true) },
+            { label: "Delete project", danger: true, onSelect: () => handlers.onDeleteProject(project.id) },
+          ]}
+        />
       </div>
 
       {notesOpen && (
-        <div className="px-3 pb-2">
+        <div className="px-3 pb-2 pl-12">
           <ItemNotes
             notes={project.notes}
             snippets={project.snippets}
             ownerLabel={project.name}
+            startEditing={notesFromMenu}
             onSave={(notes) => handlers.onUpdateProjectNotes(project.id, notes)}
           />
         </div>
       )}
 
       {!collapsed && (
-        <div className="border-t border-[var(--line)] px-3 py-2">
-          <TaskDnd project={project} handlers={handlers} onOpenLinks={onOpenLinks} sessionActive={sessionActive} />
-          <form
-            className="mt-2 flex gap-2"
-            onSubmit={(event) => {
-              event.preventDefault();
-              const title = taskDraft.trim();
-              if (title) {
-                handlers.onCreateTask(project.id, null, title);
-                setTaskDraft("");
-              }
-            }}
-          >
-            <input
-              type="text"
-              value={taskDraft}
-              onChange={(event) => setTaskDraft(event.target.value)}
-              placeholder="New task"
-              aria-label={`New task in ${project.name}`}
-              className="min-w-0 flex-1 rounded-md border border-[var(--line)] bg-[var(--bg)] px-3 py-1.5 text-sm text-[var(--fg)] placeholder:text-[var(--muted)]"
-            />
-            <button
-              type="submit"
-              disabled={taskDraft.trim() === ""}
-              className="rounded-md border border-[var(--line)] px-3 py-1.5 text-sm text-[var(--fg)] hover:border-[var(--muted)] disabled:opacity-50"
+        <div className="border-t border-[var(--line)] px-1.5 py-1.5 sm:px-2">
+          <TaskDnd
+            project={project}
+            handlers={handlers}
+            onOpenLinks={onOpenLinks}
+            sessionActive={sessionActive}
+            showDone={showDone}
+          />
+          <div className="flex flex-wrap items-center gap-2 pl-6">
+            <form
+              className="flex min-w-[12rem] flex-1"
+              onSubmit={(event) => {
+                event.preventDefault();
+                const title = taskDraft.trim();
+                if (title) {
+                  handlers.onCreateTask(project.id, null, title);
+                  setTaskDraft("");
+                }
+              }}
             >
-              Add task
-            </button>
-          </form>
+              <input
+                type="text"
+                value={taskDraft}
+                onChange={(event) => setTaskDraft(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Escape") {
+                    setTaskDraft("");
+                    event.currentTarget.blur();
+                  }
+                }}
+                placeholder="+ Add task"
+                aria-label={`New task in ${project.name}`}
+                className={QUIET_INPUT}
+              />
+            </form>
+            {doneCount > 0 && (
+              <button type="button" onClick={onToggleShowDone} aria-expanded={showDone} className={`${BTN_QUIET} text-[13px]`}>
+                {showDone ? "Hide done" : `Show ${doneCount} done`}
+              </button>
+            )}
+          </div>
         </div>
       )}
     </div>
@@ -505,18 +571,39 @@ export function ProjectsPanel({
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
+  const [newOpen, setNewOpen] = useState(false);
   const [newProjectName, setNewProjectName] = useState("");
   const [collapsedIds, setCollapsedIds] = useState<string[]>([]);
+  const [showDoneIds, setShowDoneIds] = useState<string[]>([]);
   const [linksOwner, setLinksOwner] = useState<LinkOwner | null>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [moreBelow, setMoreBelow] = useState(false);
 
   useEffect(() => {
-    setCollapsedIds(readCollapsedProjects());
+    setCollapsedIds(readIds(COLLAPSED_KEY));
+    setShowDoneIds(readIds(SHOW_DONE_KEY));
   }, []);
 
-  function toggleCollapsed(projectId: string) {
-    setCollapsedIds((prev) => {
+  // Fade the bottom edge only while there is more to scroll to.
+  useEffect(() => {
+    const box = scrollRef.current;
+    if (!box) return;
+    const update = () => setMoreBelow(box.scrollHeight - box.scrollTop - box.clientHeight > 4);
+    update();
+    box.addEventListener("scroll", update, { passive: true });
+    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(update);
+    observer?.observe(box);
+    if (box.firstElementChild) observer?.observe(box.firstElementChild);
+    return () => {
+      box.removeEventListener("scroll", update);
+      observer?.disconnect();
+    };
+  }, [projects]);
+
+  function toggleIn(key: string, setter: React.Dispatch<React.SetStateAction<string[]>>, projectId: string) {
+    setter((prev) => {
       const next = prev.includes(projectId) ? prev.filter((id) => id !== projectId) : [...prev, projectId];
-      persistCollapsedProjects(next);
+      persistIds(key, next);
       return next;
     });
   }
@@ -529,58 +616,51 @@ export function ProjectsPanel({
     handlers.onReorder("projects", next);
   }
 
+  const closeNew = () => {
+    setNewOpen(false);
+    setNewProjectName("");
+  };
+
   const projectIds = projects.map((project) => project.id);
 
   return (
-    <section
-      aria-label="Projects"
-      className="flex max-h-[75vh] min-h-0 flex-col rounded-lg border border-[var(--line)] bg-[var(--surface)] p-4"
-    >
-      <div className="mb-4 flex shrink-0 flex-wrap items-center justify-between gap-3">
-        <h2 className="text-base font-semibold text-[var(--fg)]">Projects</h2>
-        <form
-          className="flex w-full gap-2 sm:w-auto"
-          onSubmit={(event) => {
-            event.preventDefault();
-            const name = newProjectName.trim();
-            if (name) {
-              handlers.onCreateProject(name);
-              setNewProjectName("");
-            }
-          }}
-        >
-          <input
-            type="text"
-            value={newProjectName}
-            onChange={(event) => setNewProjectName(event.target.value)}
-            placeholder="New project name"
-            aria-label="New project name"
-            className="min-w-0 flex-1 rounded-md border border-[var(--line)] bg-[var(--bg)] px-3 py-1.5 text-sm text-[var(--fg)] placeholder:text-[var(--muted)] sm:w-64 sm:flex-none"
-          />
-          <button
-            type="submit"
-            disabled={newProjectName.trim() === ""}
-            className="rounded-md border border-[var(--line)] px-3 py-1.5 text-sm text-[var(--fg)] hover:border-[var(--muted)] disabled:opacity-50"
-          >
-            Add project
-          </button>
-        </form>
+    <section aria-label="Projects" className={`${CARD} flex min-h-0 flex-col lg:max-h-[78vh]`}>
+      <div className="mb-3 flex shrink-0 items-center justify-between gap-3">
+        <h2 className={CARD_TITLE}>
+          Projects
+          {projects.length > 0 && <span className="ml-2 text-sm font-normal text-[var(--muted)]">{projects.length}</span>}
+        </h2>
+        <button type="button" onClick={() => setNewOpen(true)} className={BTN_QUIET}>
+          <PlusIcon size={14} />
+          New project
+        </button>
       </div>
 
-      {/* Only the project list scrolls; the title and add form stay put. */}
-      <div className="min-h-0 flex-1 overflow-y-auto pr-1">
+      {/* On desktop only the project list scrolls; phones scroll the page instead of a box inside it. */}
+      <div
+        ref={scrollRef}
+        className={`-mx-1 min-h-0 flex-1 px-1 lg:overflow-y-auto ${moreBelow ? "lg:lockedin-fade-bottom" : ""}`}
+      >
         {projects.length === 0 ? (
-          <p className="text-sm text-[var(--muted)]">No projects yet. Add one above to get started.</p>
+          <div className="rounded-md border border-dashed border-[var(--line)] px-4 py-8 text-center">
+            <p className="text-sm text-[var(--fg)]">No projects yet.</p>
+            <p className="mt-1 text-[13px] text-[var(--muted)]">A project holds the tasks you start sessions on.</p>
+            <button type="button" onClick={() => setNewOpen(true)} className={`${BTN_PRIMARY} mt-4`}>
+              Create a project
+            </button>
+          </div>
         ) : (
           <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onProjectDragEnd}>
             <SortableContext items={projectIds} strategy={verticalListSortingStrategy}>
-              <div className="space-y-3">
+              <div className="space-y-3 pb-1">
                 {projects.map((project) => (
                   <ProjectBlock
                     key={project.id}
                     project={project}
                     collapsed={collapsedIds.includes(project.id)}
-                    onToggleCollapsed={() => toggleCollapsed(project.id)}
+                    onToggleCollapsed={() => toggleIn(COLLAPSED_KEY, setCollapsedIds, project.id)}
+                    showDone={showDoneIds.includes(project.id)}
+                    onToggleShowDone={() => toggleIn(SHOW_DONE_KEY, setShowDoneIds, project.id)}
                     handlers={handlers}
                     onOpenLinks={setLinksOwner}
                     sessionActive={sessionActive}
@@ -591,6 +671,48 @@ export function ProjectsPanel({
           </DndContext>
         )}
       </div>
+
+      {newOpen && (
+        <Modal
+          title="New project"
+          onClose={closeNew}
+          footer={
+            <>
+              <button type="button" onClick={closeNew} className={BTN_QUIET}>
+                Cancel
+              </button>
+              <button type="submit" form="new-project-form" disabled={newProjectName.trim() === ""} className={BTN_PRIMARY}>
+                Add project
+              </button>
+            </>
+          }
+        >
+          <form
+            id="new-project-form"
+            onSubmit={(event) => {
+              event.preventDefault();
+              const name = newProjectName.trim();
+              if (name) {
+                handlers.onCreateProject(name);
+                closeNew();
+              }
+            }}
+          >
+            <label className={FIELD_LABEL} htmlFor="new-project-name">
+              Project name
+            </label>
+            <input
+              id="new-project-name"
+              type="text"
+              value={newProjectName}
+              onChange={(event) => setNewProjectName(event.target.value)}
+              placeholder="e.g. Job search"
+              aria-label="New project name"
+              className={INPUT}
+            />
+          </form>
+        </Modal>
+      )}
 
       {linksOwner && (
         <LinksModal

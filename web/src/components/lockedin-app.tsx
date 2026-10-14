@@ -6,18 +6,19 @@
 // and every 30 seconds (SPEC 8.17). T2 adds the full tree handlers, links,
 // settings, and the completion celebration (SPEC 8.2, 8.3, 8.10).
 import Image from "next/image";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { callExtension } from "@/lib/bridge-client";
 import type { CelebrationStyle, DashboardData, HelperMode, SettingsData } from "@/lib/dashboard-data";
 import type { ExtensionSession, LockMode } from "@/lib/extension-session";
 import { shouldCelebrate } from "@/lib/celebration";
 import { projectOfTask, projectProgress, withTaskDone } from "@/lib/tree";
 import { runSyncCycle } from "@/lib/sync-cycle";
+import { UNDO_WINDOW_MS, hidePending, undoLabel } from "@/lib/pending-delete";
 import { toExtensionTree } from "@/lib/extension-tree";
 import { BlockedSitesPanel } from "./blocked-sites-panel";
 import { CelebrationOverlay } from "./celebration-overlay";
 import EodSection from "./EodPreviewModal";
-import { MiscTasksPanel } from "./misc-tasks-panel";
+import { ChevronIcon } from "./icons";
 import { Modal } from "./modal";
 import { NotesPanel } from "./notes-panel";
 import { OpenLoopsPanel } from "./open-loops-panel";
@@ -30,19 +31,20 @@ import { StuckModal } from "./stuck-modal";
 import { StatsStrip } from "./stats-strip";
 import { TimeStudyPanel } from "./time-study-panel";
 import { TimeStudyPromptCard } from "./time-study-prompt";
-import { TomorrowPlanPanel } from "./tomorrow-plan-panel";
+import { PlanPanel } from "./tomorrow-plan-panel";
+import { BTN_PRIMARY, BTN_QUIET, BTN_SECONDARY, CARD, CARD_TITLE, RowMenu, TOAST } from "./ui";
 import WindDownSection from "./wind-down-modal";
 
 type ConnectionState = "checking" | "connected" | "disconnected";
 
 const JSON_HEADERS = { "Content-Type": "application/json" };
 
-// Quiet buttons: one accent button per screen ("Start working"), the rest neutral.
-const PILL =
-  "rounded-md border border-[var(--line)] px-3 py-1.5 text-sm text-[var(--muted)] transition-colors hover:border-[var(--muted)] hover:text-[var(--fg)]";
-const WIDE_BUTTON =
-  "w-full rounded-md border border-[var(--line)] bg-[var(--surface-2)] px-3 py-2 text-sm text-[var(--fg)] transition-colors hover:border-[var(--muted)]";
-const CARD = "rounded-lg border border-[var(--line)] bg-[var(--surface)] p-4";
+// One accent button per screen ("Start working"), the rest neutral.
+const WIDE_BUTTON = `${BTN_SECONDARY} w-full`;
+const GUTTER = "px-[clamp(16px,2.6vw,40px)]";
+
+type ToastState = { message: string; action?: { label: string; onClick: () => void } };
+type PendingDelete = { timer: ReturnType<typeof setTimeout>; url: string };
 
 function connectionDot(state: ConnectionState): { background: string; text: string } {
   if (state === "connected") return { background: "var(--ok)", text: "Extension connected" };
@@ -67,7 +69,15 @@ export function LockedInApp({ initialData }: { initialData: DashboardData }) {
   const [justEnded, setJustEnded] = useState(false);
   // Global "Float timer" toggle (SPEC 8.6), mirrored from the extension.
   const [floatEnabled, setFloatEnabled] = useState(true);
-  const [toast, setToast] = useState<string | null>(null);
+  const [toast, setToast] = useState<ToastState | null>(null);
+  // Deletes wait out an undo window before they reach the database; their ids
+  // stay hidden from every panel meanwhile (UI polish, Oct 2026).
+  const [hiddenIds, setHiddenIds] = useState<ReadonlySet<string>>(() => new Set());
+  const pendingRef = useRef<Map<string, PendingDelete>>(new Map());
+  // Tools menu opens these windows by bumping a counter.
+  const [organizeRequest, setOrganizeRequest] = useState(0);
+  const [stuckRequest, setStuckRequest] = useState(0);
+  const connectionRef = useRef<ConnectionState>("checking");
   // Top bar tools that open in a floating window.
   const [tool, setTool] = useState<"sites" | "study" | null>(null);
   const [sitesError, setSitesError] = useState<string | null>(null);
@@ -84,10 +94,10 @@ export function LockedInApp({ initialData }: { initialData: DashboardData }) {
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastSessionRef = useRef<ExtensionSession | null>(null);
 
-  const showToast = useCallback((message: string) => {
-    setToast(message);
+  const showToast = useCallback((message: string, action?: ToastState["action"]) => {
+    setToast({ message, action });
     if (toastTimer.current) clearTimeout(toastTimer.current);
-    toastTimer.current = setTimeout(() => setToast(null), 4000);
+    toastTimer.current = setTimeout(() => setToast(null), action ? UNDO_WINDOW_MS : 4000);
   }, []);
 
   const refetchData = useCallback(async () => {
@@ -117,7 +127,10 @@ export function LockedInApp({ initialData }: { initialData: DashboardData }) {
     let alive = true;
     const ping = async () => {
       const reply = await callExtension("ping");
-      if (alive) setConnection(reply.ok ? "connected" : "disconnected");
+      if (!alive) return;
+      const next: ConnectionState = reply.ok ? "connected" : "disconnected";
+      connectionRef.current = next;
+      setConnection(next);
     };
     void ping();
     const timer = setInterval(ping, 3000);
@@ -169,7 +182,9 @@ export function LockedInApp({ initialData }: { initialData: DashboardData }) {
     const cycle = async () => {
       const result = await runSyncCycle();
       if (!alive) return;
-      if (!result.ok && result.error) showToast(result.error);
+      // While the extension is not connected the banner already says so; a
+      // toast with the same news every 30 seconds would only repeat it.
+      if (!result.ok && result.error && connectionRef.current !== "disconnected") showToast(result.error);
       if (result.savedSessions > 0 || result.savedInfractions > 0 || result.savedTimeStudies > 0) {
         await refetchData();
         if (result.savedSessions > 0) showToast("Session saved");
@@ -208,6 +223,54 @@ export function LockedInApp({ initialData }: { initialData: DashboardData }) {
     },
     [refetchData, showToast],
   );
+
+  // Delete with undo: hide now, send the DELETE when the undo window closes.
+  const scheduleDelete = useCallback(
+    (id: string, name: string, url: string) => {
+      const pending = pendingRef.current;
+      const existing = pending.get(id);
+      if (existing) clearTimeout(existing.timer);
+      setHiddenIds((prev) => new Set(prev).add(id));
+      const unhide = () =>
+        setHiddenIds((prev) => {
+          const next = new Set(prev);
+          next.delete(id);
+          return next;
+        });
+      const timer = setTimeout(() => {
+        pending.delete(id);
+        void apiCall(url, { method: "DELETE" }).then(unhide);
+      }, UNDO_WINDOW_MS);
+      pending.set(id, { timer, url });
+      showToast(undoLabel(name), {
+        label: "Undo",
+        onClick: () => {
+          const entry = pending.get(id);
+          if (!entry) return;
+          clearTimeout(entry.timer);
+          pending.delete(id);
+          unhide();
+          setToast(null);
+        },
+      });
+    },
+    [apiCall, showToast],
+  );
+
+  // Closing the tab mid-window still deletes: keepalive lets the request finish.
+  useEffect(() => {
+    const flush = () => {
+      for (const [id, entry] of pendingRef.current) {
+        clearTimeout(entry.timer);
+        void fetch(entry.url, { method: "DELETE", keepalive: true }).catch(() => undefined);
+        pendingRef.current.delete(id);
+      }
+    };
+    window.addEventListener("pagehide", flush);
+    return () => window.removeEventListener("pagehide", flush);
+  }, []);
+
+  const view = useMemo(() => hidePending(data, hiddenIds), [data, hiddenIds]);
 
   const startSession = useCallback(
     async (spec: {
@@ -350,7 +413,8 @@ export function LockedInApp({ initialData }: { initialData: DashboardData }) {
       });
     },
     onDeleteProject: (projectId) => {
-      void apiCall(`/api/projects/${projectId}`, { method: "DELETE" });
+      const name = data.projects.find((project) => project.id === projectId)?.name ?? "project";
+      scheduleDelete(projectId, name, `/api/projects/${projectId}`);
     },
     // Reorder refetches even on failure so a rejected drag does not leave the
     // panel showing an order the database refused.
@@ -403,7 +467,9 @@ export function LockedInApp({ initialData }: { initialData: DashboardData }) {
       }
     },
     onDeleteTask: (taskId) => {
-      void apiCall(`/api/tasks/${taskId}`, { method: "DELETE" });
+      const all = data.projects.flatMap((project) => project.tasks.flatMap((task) => [task, ...task.subtasks]));
+      const name = all.find((task) => task.id === taskId)?.title ?? "task";
+      scheduleDelete(taskId, name, `/api/tasks/${taskId}`);
     },
     onUpdateTaskNotes: (taskId, notes) => {
       void apiCall(`/api/tasks/${taskId}`, {
@@ -457,9 +523,10 @@ export function LockedInApp({ initialData }: { initialData: DashboardData }) {
 
   const deleteLoop = useCallback(
     (loopId: string) => {
-      void apiCall(`/api/open-loops/${loopId}`, { method: "DELETE" });
+      const name = data.openLoops.find((loop) => loop.id === loopId)?.text ?? "open loop";
+      scheduleDelete(loopId, name, `/api/open-loops/${loopId}`);
     },
-    [apiCall],
+    [data.openLoops, scheduleDelete],
   );
 
   // Misc tasks (SPEC 8.9): one-line items; no notes, no links, never in wind
@@ -485,9 +552,10 @@ export function LockedInApp({ initialData }: { initialData: DashboardData }) {
 
   const deleteMiscTask = useCallback(
     (id: string) => {
-      void apiCall(`/api/misc-tasks/${id}`, { method: "DELETE" });
+      const name = data.miscTasks.find((task) => task.id === id)?.title ?? "misc task";
+      scheduleDelete(id, name, `/api/misc-tasks/${id}`);
     },
-    [apiCall],
+    [data.miscTasks, scheduleDelete],
   );
 
   const reorderMiscTasks = useCallback(
@@ -592,6 +660,7 @@ export function LockedInApp({ initialData }: { initialData: DashboardData }) {
   );
 
   const dot = connectionDot(connection);
+  const sessionProject = session?.projectId ? (data.projects.find((p) => p.id === session.projectId)?.name ?? null) : null;
 
   const startButton = (
     <button
@@ -603,162 +672,187 @@ export function LockedInApp({ initialData }: { initialData: DashboardData }) {
         setStartOpen(true);
       }}
       disabled={connection === "disconnected"}
-      className="w-full rounded-md px-4 py-2.5 text-sm font-medium text-[var(--on-accent)] disabled:opacity-50"
-      style={{ background: "var(--accent-strong)" }}
+      title={connection === "disconnected" ? "Connect the extension to start a session" : undefined}
+      // With no projects yet, "Create a project" is the main action, so this one steps back.
+      className={`${data.projects.length === 0 ? BTN_SECONDARY : BTN_PRIMARY} w-full py-2.5`}
     >
       {justEnded ? "Start another session" : "Start working"}
     </button>
   );
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-[1760px] flex-col gap-6 px-[clamp(16px,2.6vw,40px)] py-6">
-      <header className="sticky top-0 z-10 -mx-[clamp(16px,2.6vw,40px)] flex flex-wrap items-center gap-3 border-b border-[var(--line)] px-[clamp(16px,2.6vw,40px)] py-3">
+    <div className="min-h-screen">
+      <header className="sticky top-0 z-20 border-b border-[var(--line)]">
         {/* The frosted layer sits behind the bar, not on it: a blur on the bar itself would trap the pop-up windows inside it. */}
         <div
           aria-hidden
           className="absolute inset-0 -z-10 bg-[color-mix(in_srgb,var(--bg)_82%,transparent)] backdrop-blur"
         />
-        <span className="flex items-center gap-2 text-lg font-semibold text-[var(--fg)]">
-          {/* Brand mark: the pink eyes icon, same file as the favicon. */}
-          <Image src="/icon.png" alt="" width={30} height={30} priority className="h-7 w-7 sm:h-[30px] sm:w-[30px]" />
-          LockedIn
-        </span>
-        <span className="hidden text-sm text-[var(--muted)] sm:inline">
-          Welcome back, {data.settings.display_name}
-        </span>
-        <ProfileMenu
-          settings={data.settings}
-          aiAvailable={aiAvailable}
-          error={settingsError}
-          onSave={saveSettings}
-          align="left"
-        />
-        <div className="ml-auto flex flex-wrap items-center gap-2">
-          <button type="button" onClick={() => setTool("sites")} className={PILL}>
-            Edit blocked sites
-          </button>
-          <button type="button" onClick={() => setTool("study")} className={PILL}>
-            Time study
-          </button>
-          <OrganizeModal
-            trigger="pill"
-            projects={data.projects}
-            miscTasks={data.miscTasks}
-            initialMode={data.settings.helper_mode}
-            onToast={showToast}
-            onChanged={() => void refetchData()}
-            onStartItem={(item) => {
-              // Existing dialog only pre-targets misc items; task targeting
-              // lands with T3's row timer work (SPEC 8.4).
-              if (item.kind === "misc") setStartMiscTask({ id: item.id, title: item.title });
-              setStartOpen(true);
-            }}
-          />
-          <StuckModal
-            trigger="pill"
-            projects={data.projects}
-            initialMode={data.settings.helper_mode}
-            onToast={showToast}
-            onChanged={() => void refetchData()}
-            onStartTask={(taskId) => {
-              // Same handoff the organize flow uses: pre-target the existing
-              // start dialog; with no task picked, open it clean.
-              setStartMiscTask(null);
-              if (taskId) startOnTask(taskId);
-              else setStartWith(null);
-              setStartOpen(true);
-            }}
-          />
-          <span
-            className="flex items-center gap-2 rounded-full border border-[var(--line)] px-3 py-1 text-xs"
-            style={{ color: dot.background }}
-          >
-            <span aria-hidden className="inline-block h-2 w-2 rounded-full" style={{ background: dot.background }} />
-            {dot.text}
+        <div className={`mx-auto flex h-14 max-w-[1760px] items-center gap-2 sm:h-16 ${GUTTER}`}>
+          <span className="flex items-center gap-2.5 text-[17px] font-semibold text-[var(--fg)]">
+            {/* Brand mark: the pink eyes icon, same file as the favicon. */}
+            <Image src="/icon.png" alt="" width={32} height={32} priority className="h-8 w-8 rounded-[6px] sm:h-[34px] sm:w-[34px]" />
+            LockedIn
           </span>
+          <div className="ml-auto flex items-center gap-1 sm:gap-2">
+            <button type="button" onClick={() => setStuckRequest((n) => n + 1)} className={`${BTN_QUIET} hidden sm:inline-flex`}>
+              I&apos;m stuck
+            </button>
+            <RowMenu
+              label="Tools"
+              buttonClassName={`${BTN_QUIET} text-[var(--fg)]`}
+              buttonContent={
+                <>
+                  Tools
+                  <ChevronIcon size={14} className="rotate-90 text-[var(--muted)]" />
+                </>
+              }
+              items={[
+                { label: "Organize my task list", onSelect: () => setOrganizeRequest((n) => n + 1) },
+                { label: "I'm stuck, help me start", onSelect: () => setStuckRequest((n) => n + 1) },
+                { label: "Time study", onSelect: () => setTool("study") },
+                { label: "Edit blocked sites", onSelect: () => setTool("sites") },
+              ]}
+            />
+            <span className="ml-1 sm:ml-2">
+              <ProfileMenu
+                settings={data.settings}
+                aiAvailable={aiAvailable}
+                error={settingsError}
+                onSave={saveSettings}
+                align="right"
+                statusColor={dot.background}
+                statusText={dot.text}
+              />
+            </span>
+          </div>
         </div>
       </header>
 
-      {session && (
-        <SessionPanel
-          session={session}
-          nowMs={nowMs}
-          softUnlockAtMs={softUnlockAt}
-          floatEnabled={floatEnabled}
-          onToggleFloat={toggleFloat}
-          onControl={controlSession}
-          onManualInfraction={addManualInfraction}
-        />
-      )}
-
-      <StatsStrip
-        sessions={data.todaySessions}
-        infractions={data.todayInfractions}
+      <OrganizeModal
+        trigger="none"
+        openRequest={organizeRequest}
         projects={data.projects}
-        liveSession={session}
-        nowMs={nowMs}
-        startSlot={session ? null : startButton}
-        reportsSlot={<EodSection buttonClassName={WIDE_BUTTON} />}
+        miscTasks={data.miscTasks}
+        initialMode={data.settings.helper_mode}
+        onToast={showToast}
+        onChanged={() => void refetchData()}
+        onStartItem={(item) => {
+          // Existing dialog only pre-targets misc items; task targeting
+          // lands with T3's row timer work (SPEC 8.4).
+          if (item.kind === "misc") setStartMiscTask({ id: item.id, title: item.title });
+          setStartOpen(true);
+        }}
       />
-      {connection === "disconnected" && (
-        <p className="-mt-3 text-xs text-[var(--warn)]">
-          The extension is not connected, so sessions and blocking are unavailable. Check the Dashboard URL in the
-          extension popup.
-        </p>
-      )}
+      <StuckModal
+        trigger="none"
+        openRequest={stuckRequest}
+        projects={data.projects}
+        initialMode={data.settings.helper_mode}
+        onToast={showToast}
+        onChanged={() => void refetchData()}
+        onStartTask={(taskId) => {
+          // Same handoff the organize flow uses: pre-target the existing
+          // start dialog; with no task picked, open it clean.
+          setStartMiscTask(null);
+          if (taskId) startOnTask(taskId);
+          else setStartWith(null);
+          setStartOpen(true);
+        }}
+      />
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,7fr)_minmax(0,3fr)]">
-        <ProjectsPanel
+      <main className={`mx-auto flex max-w-[1760px] flex-col gap-5 pb-10 pt-5 sm:gap-6 sm:pt-6 ${GUTTER}`}>
+        {connection === "disconnected" && (
+          <div
+            role="status"
+            className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-[color-mix(in_srgb,var(--warn)_35%,var(--line))] bg-[color-mix(in_srgb,var(--warn)_6%,var(--surface))] px-4 py-3 text-sm"
+          >
+            <span aria-hidden className="h-2 w-2 shrink-0 rounded-full bg-[var(--warn)]" />
+            <span className="font-medium text-[var(--fg)]">The extension is not connected.</span>
+            <span className="text-[var(--muted)]">
+              Sessions and blocking are off. Open the LockedIn extension and check its Dashboard URL.
+            </span>
+          </div>
+        )}
+
+        {session && (
+          <SessionPanel
+            session={session}
+            projectName={sessionProject}
+            nowMs={nowMs}
+            softUnlockAtMs={softUnlockAt}
+            floatEnabled={floatEnabled}
+            onToggleFloat={toggleFloat}
+            onControl={controlSession}
+            onManualInfraction={addManualInfraction}
+          />
+        )}
+
+        <StatsStrip
+          sessions={data.todaySessions}
+          infractions={data.todayInfractions}
           projects={data.projects}
-          handlers={panelHandlers}
-          addLinkError={linksError}
-          sessionActive={session !== null}
+          liveSession={session}
+          nowMs={nowMs}
+          startSlot={session ? null : startButton}
         />
 
-        <div className="flex flex-col gap-4">
-          <section aria-label="Wind down and night prep" className={CARD}>
-            <h2 className="text-base font-semibold text-[var(--fg)]">Wind down &amp; night prep</h2>
-            <p className="mt-1 text-xs text-[var(--muted)]">Eight quick steps to set up tomorrow.</p>
-            <div className="mt-3">
+        {/* Desktop: Projects on the left, Evening then the plan on the right.
+            Phones: the plan comes first, then Projects, then Evening. */}
+        <div className="grid grid-cols-1 items-start gap-5 sm:gap-6 lg:grid-cols-[minmax(0,7fr)_minmax(0,3fr)] lg:grid-rows-[auto_1fr]">
+          <div className="order-2 min-w-0 lg:order-none lg:col-start-1 lg:row-span-2 lg:row-start-1">
+            <ProjectsPanel
+              projects={view.projects}
+              handlers={panelHandlers}
+              addLinkError={linksError}
+              sessionActive={session !== null}
+            />
+          </div>
+
+          <section aria-label="Evening" className={`${CARD} order-3 lg:order-none lg:col-start-2 lg:row-start-1`}>
+            <h2 className={CARD_TITLE}>Evening</h2>
+            <p className="mt-0.5 text-[13px] text-[var(--muted)]">Wind down sets up tomorrow. Send EOD emails your day.</p>
+            <div className="mt-3 grid grid-cols-2 gap-2">
               <WindDownSection buttonClassName={WIDE_BUTTON} />
+              <EodSection buttonClassName={WIDE_BUTTON} />
             </div>
           </section>
-          <TomorrowPlanPanel
-            startDisabled={session !== null}
-            onToggleTask={panelHandlers.onToggleTask}
-            onStartTask={startOnTask}
-            onPlanCompleted={() =>
-              setCelebration((prev) => prev ?? { name: data.settings.display_name, style: data.settings.completion_style })
-            }
-          />
-          <MiscTasksPanel
-            miscTasks={data.miscTasks}
-            startDisabled={session !== null}
-            onCreate={createMiscTask}
-            onToggle={toggleMiscTask}
-            onDelete={deleteMiscTask}
-            onReorder={reorderMiscTasks}
-            onStart={(id) => {
-              const task = data.miscTasks.find((t) => t.id === id);
-              if (task) {
-                setStartMiscTask({ id: task.id, title: task.title });
-                setStartOpen(true);
+
+          <div className="order-1 min-w-0 lg:order-none lg:col-start-2 lg:row-start-2">
+            <PlanPanel
+              startDisabled={session !== null}
+              onToggleTask={panelHandlers.onToggleTask}
+              onStartTask={startOnTask}
+              onPlanCompleted={() =>
+                setCelebration((prev) => prev ?? { name: data.settings.display_name, style: data.settings.completion_style })
               }
+              miscTasks={view.miscTasks}
+              onCreateMisc={createMiscTask}
+              onToggleMisc={toggleMiscTask}
+              onDeleteMisc={deleteMiscTask}
+              onReorderMisc={reorderMiscTasks}
+              onStartMisc={(id) => {
+                const task = data.miscTasks.find((t) => t.id === id);
+                if (task) {
+                  setStartMiscTask({ id: task.id, title: task.title });
+                  setStartOpen(true);
+                }
+              }}
+            />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 items-start gap-5 sm:gap-6 lg:grid-cols-2">
+          <NotesPanel
+            projects={data.projects}
+            onAttached={() => {
+              showToast("Snippet attached");
+              void refetchData();
             }}
           />
+          <OpenLoopsPanel loops={view.openLoops} onCreate={createLoop} onDelete={deleteLoop} />
         </div>
-      </div>
-
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <NotesPanel
-          projects={data.projects}
-          onAttached={() => {
-            showToast("Snippet attached");
-            void refetchData();
-          }}
-        />
-        <OpenLoopsPanel loops={data.openLoops} onCreate={createLoop} onDelete={deleteLoop} />
-      </div>
+      </main>
 
       {tool === "sites" && (
         <Modal title="Edit blocked sites" onClose={() => setTool(null)}>
@@ -817,13 +911,19 @@ export function LockedInApp({ initialData }: { initialData: DashboardData }) {
       )}
 
       {toast && (
-        <div
-          role="status"
-          className="fixed bottom-4 left-4 z-50 rounded-lg border border-[var(--line)] bg-[var(--surface-2)] px-4 py-2 text-sm text-[var(--fg)] shadow-[0_6px_16px_rgba(0,0,0,0.3)]"
-        >
-          {toast}
+        <div role="status" className={TOAST}>
+          <span className="min-w-0 truncate">{toast.message}</span>
+          {toast.action && (
+            <button
+              type="button"
+              onClick={toast.action.onClick}
+              className="-my-1 shrink-0 rounded-md px-2 py-1 text-sm font-semibold text-[var(--fg)] underline decoration-[var(--muted)] underline-offset-4 hover:bg-[var(--line)]"
+            >
+              {toast.action.label}
+            </button>
+          )}
         </div>
       )}
-    </main>
+    </div>
   );
 }

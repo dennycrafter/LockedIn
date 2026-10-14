@@ -14,7 +14,7 @@
 // mapped back), rendering from the parsed ranked list with the same
 // confirm-then-write actions and the same start dialog handoff.
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { AiContext } from "@/lib/ai/types";
 import { formatUndoneTaskContext } from "@/lib/ai-client";
 import type { MiscTaskData, ProjectData } from "@/lib/dashboard-data";
@@ -42,8 +42,8 @@ const RATING_BUTTON = "rounded-md border px-3 py-1.5 text-sm disabled:opacity-40
 
 function ratingButtonStyle(active: boolean): React.CSSProperties {
   return active
-    ? { borderColor: "var(--muted)", color: "var(--fg)" }
-    : { borderColor: "var(--line)", color: "var(--fg)" };
+    ? { borderColor: "var(--muted)", background: "var(--line)", color: "var(--fg)" }
+    : { borderColor: "var(--line)", color: "var(--muted)" };
 }
 
 function ChoiceRow({
@@ -86,6 +86,7 @@ export function OrganizeModal({
   onStartItem,
   initialMode,
   trigger = "card",
+  openRequest = 0,
 }: {
   projects: ProjectData[];
   miscTasks: MiscTaskData[];
@@ -98,8 +99,11 @@ export function OrganizeModal({
   /** SPEC 8.15: the configured helper mode decides how the modal opens; the
    * in-modal switch still works within an open session. */
   initialMode?: "scripted" | "ai";
-  /** "pill" shows a small top bar button instead of the card when closed. */
-  trigger?: "card" | "pill";
+  /** "pill" shows a small top bar button instead of the card when closed;
+   * "none" renders nothing until openRequest changes (opened from a menu). */
+  trigger?: "card" | "pill" | "none";
+  /** Bump this number to open the window from outside (top bar Tools menu). */
+  openRequest?: number;
 }) {
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<"scripted" | "ai">("scripted");
@@ -146,6 +150,13 @@ export function OrganizeModal({
     setPlanError(null);
     setOpen(true);
   };
+
+  // Opened from outside (the Tools menu): the latest openFresh runs once per request.
+  const openFreshRef = useRef(openFresh);
+  openFreshRef.current = openFresh;
+  useEffect(() => {
+    if (openRequest > 0) openFreshRef.current();
+  }, [openRequest]);
   const close = () => setOpen(false);
 
   const toggle = (id: string, on: boolean) => {
@@ -249,6 +260,8 @@ export function OrganizeModal({
       </div>
     );
   };
+
+  if (!open && trigger === "none") return null;
 
   if (!open && trigger === "pill") {
     return (

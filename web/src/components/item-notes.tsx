@@ -19,13 +19,16 @@ export function ItemNotes({
   snippets,
   ownerLabel,
   onSave,
+  startEditing = false,
 }: {
   notes: string;
   snippets: SnippetData[];
   ownerLabel: string;
   onSave: (notes: string) => void;
+  /** Open straight into the text box (used when Notes is picked from a row menu on an empty note). */
+  startEditing?: boolean;
 }) {
-  const [editing, setEditing] = useState(false);
+  const [editing, setEditing] = useState(startEditing);
   const [draft, setDraft] = useState(notes);
   const boxRef = useRef<HTMLTextAreaElement>(null);
 
@@ -44,7 +47,7 @@ export function ItemNotes({
           <button
             type="button"
             onClick={() => setEditing(true)}
-            className="text-left text-xs text-[var(--muted)] hover:text-[var(--fg)]"
+            className="text-left text-[13px] text-[var(--muted)] hover:text-[var(--fg)]"
           >
             + Add a note
           </button>
@@ -53,7 +56,7 @@ export function ItemNotes({
             type="button"
             onClick={() => setEditing(true)}
             aria-label={`Edit notes on ${ownerLabel}`}
-            className="block w-full whitespace-pre-wrap rounded-md border border-[var(--line)] bg-[var(--surface-2)] px-3 py-2 text-left text-xs text-[var(--silver)] hover:border-[var(--muted)]"
+            className="block w-full whitespace-pre-wrap rounded-md border border-[var(--line)] bg-[var(--surface-2)] px-3 py-2 text-left text-[13px] text-[var(--silver)] hover:border-[var(--muted)]"
           >
             {notes}
           </button>
@@ -66,7 +69,7 @@ export function ItemNotes({
                 {snippet.context.trim() !== "" && (
                   <span className="mt-0.5 block break-words text-[var(--muted)]">{snippet.context}</span>
                 )}
-                <span className="mt-0.5 block text-[10px] uppercase tracking-wide text-[var(--muted)]">
+                <span className="mt-0.5 block text-[11px] uppercase tracking-wide text-[var(--muted)]">
                   {formatDate(snippet.created_at)}
                 </span>
               </li>
@@ -95,7 +98,7 @@ export function ItemNotes({
       rows={Math.min(10, Math.max(2, draft.split("\n").length))}
       placeholder="Type a note for this item"
       aria-label={`Notes on ${ownerLabel}`}
-      className="mt-1 w-full resize-y rounded-md border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-xs text-[var(--fg)] placeholder:text-[var(--muted)]"
+      className="mt-1 w-full resize-y rounded-md border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-[13px] text-[var(--fg)] placeholder:text-[var(--muted)]"
     />
   );
 }

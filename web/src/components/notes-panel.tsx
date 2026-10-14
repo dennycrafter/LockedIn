@@ -2,7 +2,7 @@
 
 // Simple Notes panel (SPEC 8.7): a list of notes in one box with thin
 // dividers, a pencil button that creates one, autosave through NoteEditor,
-// and delete with confirm on the open note. Rows keep their place while
+// and delete with an inline confirm on the open note. Rows keep their place while
 // editing because the list is ordered by creation, not by edit time.
 // The pop out button opens the note in a 420x640 window; both sides refetch
 // on focus. With projects provided, selecting text offers the attach "+".
@@ -11,7 +11,9 @@ import { useCallback, useEffect, useState } from "react";
 import type { ProjectData } from "@/lib/dashboard-data";
 import type { NoteData } from "@/lib/notes";
 import { noteDisplayTitle, notePreview } from "@/lib/notes";
+import { PlusIcon, PopOutIcon } from "./icons";
 import { NoteEditor } from "./note-editor";
+import { BTN_ICON, BTN_QUIET, CARD, CARD_TITLE } from "./ui";
 
 function updatedLabel(note: NoteData): string {
   const date = new Date(note.updated_at);
@@ -28,6 +30,7 @@ export function NotesPanel({
   const [notes, setNotes] = useState<NoteData[] | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const fetchNotes = useCallback(async () => {
     try {
@@ -121,7 +124,7 @@ export function NotesPanel({
 
   const deleteSelected = async () => {
     if (!selected) return;
-    if (!window.confirm(`Delete note "${noteDisplayTitle(selected.body)}"?`)) return;
+    setConfirmDelete(false);
     setError(null);
     try {
       const response = await fetch(`/api/notes/${selected.id}`, { method: "DELETE" });
@@ -169,19 +172,22 @@ export function NotesPanel({
   };
 
   return (
-    <section aria-label="Simple Notes" className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-4">
+    <section aria-label="Notes" className={CARD}>
       <div className="mb-3 flex items-center justify-between gap-2">
-        <h2 className="text-sm font-semibold text-[var(--fg)]">Simple Notes</h2>
-        <div className="flex items-center gap-1">
+        <h2 className={CARD_TITLE}>
+          Notes
+          {notes && notes.length > 0 && <span className="ml-2 text-sm font-normal text-[var(--muted)]">{notes.length}</span>}
+        </h2>
+        <div className="-mr-1.5 flex items-center gap-1">
           <button
             type="button"
             onClick={openPopout}
             disabled={!selected}
             aria-label="Pop out note"
-            title="Pop out note"
-            className="rounded-md px-2 py-1 text-base text-[var(--muted)] hover:bg-[var(--surface-2)] hover:text-[var(--fg)] disabled:opacity-40"
+            title={selected ? "Open this note in its own window" : "Pick a note to pop it out"}
+            className={BTN_ICON}
           >
-            ⧉
+            <PopOutIcon />
           </button>
           <button
             type="button"
@@ -189,19 +195,25 @@ export function NotesPanel({
             disabled={notes === null}
             aria-label="New note"
             title="New note"
-            className="rounded-md px-2 py-1 text-base text-[var(--muted)] hover:bg-[var(--surface-2)] hover:text-[var(--fg)] disabled:opacity-40"
+            className={BTN_ICON}
           >
-            ✎
+            <PlusIcon />
           </button>
         </div>
       </div>
 
-      {error && <p className="mb-2 text-xs text-[var(--bad)]">{error}</p>}
+      {error && <p className="mb-2 text-[13px] text-[var(--bad)]">{error}</p>}
 
       {notes === null ? (
-        <p className="py-2 text-xs text-[var(--muted)]">Loading notes...</p>
+        <p className="py-2 text-[13px] text-[var(--muted)]">Loading notes...</p>
       ) : notes.length === 0 ? (
-        <p className="py-2 text-xs text-[var(--muted)]">No notes yet. The pencil starts one.</p>
+        <div className="flex items-center justify-between gap-3 rounded-md border border-dashed border-[var(--line)] px-3 py-3">
+          <p className="text-[13px] text-[var(--muted)]">No notes yet.</p>
+          <button type="button" onClick={() => void createNote()} className={BTN_QUIET}>
+            <PlusIcon size={14} />
+            New note
+          </button>
+        </div>
       ) : (
         <ul className="divide-y divide-[var(--line)] overflow-hidden rounded-md border border-[var(--line)]">
           {notes.map((note) => {
@@ -210,21 +222,22 @@ export function NotesPanel({
               <li key={note.id}>
                 <button
                   type="button"
-                  onClick={() => setSelectedId(note.id)}
+                  onClick={() => {
+                    setConfirmDelete(false);
+                    setSelectedId(isSelected ? null : note.id);
+                  }}
                   aria-pressed={isSelected}
-                  className={`block w-full px-3 py-2 text-left hover:bg-[var(--surface-2)] ${
+                  className={`block w-full px-3 py-2.5 text-left hover:bg-[var(--surface-2)] ${
                     isSelected ? "bg-[var(--surface-2)]" : ""
                   }`}
                 >
-                  <span className="block truncate text-sm text-[var(--fg)]">{noteDisplayTitle(note.body)}</span>
-                  <span className="mt-0.5 flex items-baseline gap-2">
-                    <span className="min-w-0 flex-1 truncate text-xs text-[var(--muted)]">
-                      {notePreview(note.body) || " "}
-                    </span>
-                    <span className="shrink-0 text-[10px] uppercase tracking-wide text-[var(--muted)]">
-                      {updatedLabel(note)}
-                    </span>
+                  <span className="flex items-baseline gap-2">
+                    <span className="min-w-0 flex-1 truncate text-sm text-[var(--fg)]">{noteDisplayTitle(note.body)}</span>
+                    <span className="shrink-0 text-xs text-[var(--muted)]">{updatedLabel(note)}</span>
                   </span>
+                  {notePreview(note.body) !== "" && (
+                    <span className="mt-0.5 block truncate text-[13px] text-[var(--muted)]">{notePreview(note.body)}</span>
+                  )}
                 </button>
               </li>
             );
@@ -240,14 +253,26 @@ export function NotesPanel({
             label={`Edit note ${noteDisplayTitle(selected.body)}`}
             attach={projects ? { projects, onAdded: (snippet) => void attachSnippet(snippet) } : undefined}
           />
-          <div className="mt-2 flex justify-end">
-            <button
-              type="button"
-              onClick={() => void deleteSelected()}
-              className="rounded-md border border-[var(--line)] px-2 py-1 text-xs text-[var(--muted)] hover:border-[var(--bad)] hover:text-[var(--bad)]"
-            >
-              Delete note
-            </button>
+          <div className="mt-2 flex items-center justify-end gap-2">
+            {confirmDelete ? (
+              <>
+                <span className="text-[13px] text-[var(--muted)]">Delete this note?</span>
+                <button type="button" onClick={() => setConfirmDelete(false)} className={BTN_QUIET}>
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void deleteSelected()}
+                  className="rounded-md border border-[var(--bad)] px-3 py-1.5 text-sm text-[var(--bad)] hover:bg-[color-mix(in_srgb,var(--bad)_12%,transparent)]"
+                >
+                  Delete note
+                </button>
+              </>
+            ) : (
+              <button type="button" onClick={() => setConfirmDelete(true)} className={`${BTN_QUIET} hover:text-[var(--bad)]`}>
+                Delete note
+              </button>
+            )}
           </div>
         </div>
       )}

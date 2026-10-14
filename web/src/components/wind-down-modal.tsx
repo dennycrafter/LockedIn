@@ -17,6 +17,8 @@ import {
   type WindDownGetResponse,
   type WindDownSaveResponse,
 } from "@/lib/wind-down-state";
+import { Modal } from "./modal";
+import { BTN_PRIMARY, BTN_QUIET, BTN_SECONDARY, TOAST } from "./ui";
 
 const NEW_PROJECT = "__new__";
 
@@ -220,14 +222,14 @@ export default function WindDownSection({ buttonClassName }: { buttonClassName?:
               <button
                 type="button"
                 onClick={() => dispatch({ type: "choose-full" })}
-                className="rounded-md border border-[var(--line)] px-4 py-2 text-sm text-[var(--fg)] transition-colors hover:border-[var(--muted)]"
+                className={BTN_PRIMARY}
               >
                 Full wind down
               </button>
               <button
                 type="button"
                 onClick={() => dispatch({ type: "choose-planning" })}
-                className="rounded-md border border-[var(--line)] px-4 py-2 text-sm text-[var(--fg)] transition-colors hover:border-[var(--muted)]"
+                className={BTN_SECONDARY}
               >
                 Skip to planning tomorrow
               </button>
@@ -522,77 +524,46 @@ export default function WindDownSection({ buttonClassName }: { buttonClassName?:
       </button>
 
       {state.toast ? (
-        <div
-          role="status"
-          className="fixed bottom-4 left-4 z-50 rounded-lg border border-[var(--line)] bg-[var(--surface-2)] px-4 py-2 text-sm text-[var(--fg)] shadow-[0_6px_16px_rgba(0,0,0,0.3)]"
-        >
+        <div role="status" className={TOAST}>
           {state.toast}
         </div>
       ) : null}
 
       {open ? (
-        <div className="fixed inset-0 z-40 bg-black/60" onClick={() => dispatch({ type: "close" })}>
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-label="Wind down"
-            onClick={(event) => event.stopPropagation()}
-            className="absolute inset-x-4 top-1/2 mx-auto max-h-[85vh] max-w-xl -translate-y-1/2 overflow-y-auto rounded-lg border border-[var(--line)] bg-[var(--surface-2)] p-6 shadow-[0_6px_16px_rgba(0,0,0,0.3)]"
-          >
-            <div className="flex items-center justify-between gap-4">
-              <h2 className="text-base font-semibold text-[var(--fg)]">
-                Wind down
-                {isReady || isSaving ? <span className="ml-2 text-xs font-normal text-[var(--muted)]">{draft.step > 0 ? `Step ${draft.step} of 8` : "Choose how to run it"}</span> : null}
-              </h2>
-              <button
-                type="button"
-                aria-label="Close wind down"
-                onClick={() => dispatch({ type: "close" })}
-                className="text-[var(--muted)] hover:text-[var(--fg)]"
-              >
-                X
-              </button>
-            </div>
-
-            {body}
-
-            {state.saveError ? <p className="mt-3 text-sm text-[var(--bad)]">{state.saveError}</p> : null}
-
-            {(isReady || isSaving) && draft.step > 0 ? (
-              <div className="mt-5 flex items-center justify-between gap-2">
+        <Modal
+          title="Wind down"
+          subtitle={isReady || isSaving ? (draft.step > 0 ? `Step ${draft.step} of 8` : "Close out today and set up tomorrow") : undefined}
+          dialogLabel="Wind down"
+          closeLabel="Close wind down"
+          size="lg"
+          onClose={() => dispatch({ type: "close" })}
+          footer={
+            (isReady || isSaving) && draft.step > 0 ? (
+              <div className="flex w-full items-center justify-between gap-2">
                 <button
                   type="button"
                   onClick={() => dispatch({ type: "back" })}
                   disabled={isSaving}
-                  className="rounded-md border border-[var(--line)] px-3 py-1.5 text-sm text-[var(--muted)] transition-colors hover:border-[var(--muted)] hover:text-[var(--fg)] disabled:opacity-40"
+                  className={BTN_QUIET}
                 >
                   Back
                 </button>
                 {draft.step < 8 ? (
-                  <button
-                    type="button"
-                    onClick={() => dispatch({ type: "next" })}
-                    disabled={isSaving}
-                    className="rounded-md px-4 py-1.5 text-sm font-medium text-[var(--on-accent)] disabled:opacity-50"
-                    style={{ background: "var(--accent-strong)" }}
-                  >
+                  <button type="button" onClick={() => dispatch({ type: "next" })} disabled={isSaving} className={BTN_PRIMARY}>
                     {draft.step === 7 ? "Task list finished" : "Next"}
                   </button>
                 ) : (
-                  <button
-                    type="button"
-                    onClick={() => void save()}
-                    disabled={isSaving}
-                    className="rounded-md px-4 py-1.5 text-sm font-medium text-[var(--on-accent)] disabled:opacity-50"
-                    style={{ background: "var(--accent-strong)" }}
-                  >
+                  <button type="button" onClick={() => void save()} disabled={isSaving} className={BTN_PRIMARY}>
                     {isSaving ? "Saving..." : "Ready for tomorrow"}
                   </button>
                 )}
               </div>
-            ) : null}
-          </div>
-        </div>
+            ) : undefined
+          }
+        >
+          {body}
+          {state.saveError ? <p className="mt-3 text-sm text-[var(--bad)]">{state.saveError}</p> : null}
+        </Modal>
       ) : null}
     </div>
   );

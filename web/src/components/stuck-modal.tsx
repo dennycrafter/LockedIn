@@ -13,28 +13,20 @@
 // session through the same start dialog handoff. X, Escape and outside click
 // cancel at any step; a fresh open starts over in scripted mode.
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { AiContext } from "@/lib/ai/types";
 import { formatUndoneTaskContext } from "@/lib/ai-client";
 import type { ProjectData } from "@/lib/dashboard-data";
 import { openLoopText, stuckTaskOptions, suggestStuckHelp, TRIED_LABELS, type StuckTaskOption, type TriedLevel } from "@/lib/stuck";
 import { AiChatPanel, type ActionableAiEntry } from "./ai-chat-panel";
 import { Modal } from "./modal";
+import { FIELD_LABEL, INPUT as SHARED_INPUT, SELECT } from "./ui";
 
 const JSON_HEADERS = { "Content-Type": "application/json" };
 
 const TRIED_LEVELS: TriedLevel[] = ["little", "some", "everything"];
 
-const CHIP = "rounded-md border px-3 py-1.5 text-sm disabled:opacity-40";
-
-const INPUT =
-  "w-full rounded-md border border-[var(--line)] bg-[var(--bg)] px-3 py-1.5 text-sm text-[var(--fg)] placeholder:text-[var(--muted)]";
-
-function chipStyle(active: boolean): React.CSSProperties {
-  return active
-    ? { borderColor: "var(--muted)", color: "var(--fg)" }
-    : { borderColor: "var(--line)", color: "var(--fg)" };
-}
+const INPUT = SHARED_INPUT;
 
 function SecondaryStartButton({ onClick }: { onClick: () => void }) {
   return (
@@ -60,11 +52,15 @@ function PickerBlock({
 }) {
   return (
     <div className="mt-3">
+      <label className={FIELD_LABEL} htmlFor="stuck-task">
+        Which task are you stuck on?
+      </label>
       <select
+        id="stuck-task"
         value={value}
         onChange={(event) => onChange(event.target.value)}
         aria-label="Which task are you stuck on?"
-        className="w-full rounded-md border border-[var(--line)] bg-[var(--bg)] px-3 py-1.5 text-sm text-[var(--fg)]"
+        className={SELECT}
       >
         <option value="">No specific task</option>
         {options.map((option) => (
@@ -87,6 +83,7 @@ export function StuckModal({
   onStartTask,
   initialMode,
   trigger = "card",
+  openRequest = 0,
 }: {
   projects: ProjectData[];
   /** Success and failure messages surface through the dashboard toast. */
@@ -98,8 +95,11 @@ export function StuckModal({
   /** SPEC 8.15: the configured helper mode decides how the modal opens; the
    * in-modal switch still works within an open session. */
   initialMode?: "scripted" | "ai";
-  /** "pill" shows a small top bar button instead of the card when closed. */
-  trigger?: "card" | "pill";
+  /** "pill" shows a small top bar button instead of the card when closed;
+   * "none" renders nothing until openRequest changes (opened from a menu). */
+  trigger?: "card" | "pill" | "none";
+  /** Bump this number to open the window from outside (top bar Tools menu). */
+  openRequest?: number;
 }) {
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<"scripted" | "ai">("scripted");
@@ -147,6 +147,13 @@ export function StuckModal({
     setLoopError(null);
     setOpen(true);
   };
+
+  // Opened from outside (the Tools menu): the latest openFresh runs once per request.
+  const openFreshRef = useRef(openFresh);
+  openFreshRef.current = openFresh;
+  useEffect(() => {
+    if (openRequest > 0) openFreshRef.current();
+  }, [openRequest]);
   const close = () => setOpen(false);
 
   const goSuggest = () => {
@@ -234,6 +241,8 @@ export function StuckModal({
     }
   };
 
+  if (!open && trigger === "none") return null;
+
   if (!open && trigger === "pill") {
     return (
       <button type="button" onClick={openFresh} className="rounded-md border border-[var(--line)] px-3 py-1.5 text-sm text-[var(--muted)] transition-colors hover:border-[var(--muted)] hover:text-[var(--fg)]">
@@ -281,34 +290,49 @@ export function StuckModal({
 
           <PickerBlock options={options} value={selectedId} onChange={setSelectedId} />
 
-          <div className="mt-3 space-y-3">
-            <input
-              type="text"
-              value={workedOn}
-              onChange={(event) => setWorkedOn(event.target.value)}
-              aria-label="What have you worked on so far?"
-              placeholder="What have you worked on so far? Leave empty if you have not started"
-              className={INPUT}
-            />
-            <input
-              type="text"
-              value={stuckWhere}
-              onChange={(event) => setStuckWhere(event.target.value)}
-              aria-label="Where exactly are you stuck?"
-              placeholder="Where exactly are you stuck? For example: the opening paragraph"
-              className={INPUT}
-            />
+          <div className="mt-4 space-y-4">
+            <div>
+              <label className={FIELD_LABEL} htmlFor="stuck-worked-on">
+                What have you worked on so far?
+              </label>
+              <input
+                id="stuck-worked-on"
+                type="text"
+                value={workedOn}
+                onChange={(event) => setWorkedOn(event.target.value)}
+                aria-label="What have you worked on so far?"
+                placeholder="Leave empty if you have not started"
+                className={INPUT}
+              />
+            </div>
+            <div>
+              <label className={FIELD_LABEL} htmlFor="stuck-where">
+                Where exactly are you stuck?
+              </label>
+              <input
+                id="stuck-where"
+                type="text"
+                value={stuckWhere}
+                onChange={(event) => setStuckWhere(event.target.value)}
+                aria-label="Where exactly are you stuck?"
+                placeholder="e.g. the opening paragraph"
+                className={INPUT}
+              />
+            </div>
             <fieldset>
-              <legend className="text-sm text-[var(--muted)]">What have you already tried?</legend>
-              <div className="mt-1 flex flex-wrap gap-2">
+              <legend className={FIELD_LABEL}>What have you already tried?</legend>
+              <div className="flex w-full overflow-hidden rounded-md border border-[var(--line)] bg-[var(--line)]" style={{ gap: 1 }}>
                 {TRIED_LEVELS.map((level) => (
                   <button
                     key={level}
                     type="button"
                     aria-pressed={tried === level}
                     onClick={() => setTried(tried === level ? null : level)}
-                    className={CHIP}
-                    style={chipStyle(tried === level)}
+                    className={`flex-auto px-3 py-1.5 text-sm transition-colors ${
+                      tried === level
+                        ? "bg-[var(--line)] font-medium text-[var(--fg)]"
+                        : "bg-[var(--bg)] text-[var(--muted)] hover:text-[var(--fg)]"
+                    }`}
                   >
                     {TRIED_LABELS[level]}
                   </button>

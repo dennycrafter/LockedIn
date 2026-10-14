@@ -37,7 +37,7 @@ export function EditableTitle({
         type="button"
         onClick={() => setEditing(true)}
         title={`Rename ${label}`}
-        className={`min-w-0 flex-1 truncate text-left hover:text-[var(--accent-ink)] ${className}`}
+        className={`min-w-0 flex-1 break-words text-left hover:text-[var(--fg)] hover:underline hover:decoration-[var(--line)] hover:underline-offset-4 ${className}`}
       >
         {title}
       </button>

@@ -7,6 +7,8 @@
 import { useState } from "react";
 import type { LinkData } from "@/lib/dashboard-data";
 import { Modal } from "./modal";
+import { TrashIcon } from "./icons";
+import { BTN_ICON, BTN_PRIMARY, BTN_QUIET, INPUT } from "./ui";
 
 export function LinksModal({
   ownerLabel,
@@ -27,13 +29,13 @@ export function LinksModal({
   const [url, setUrl] = useState("");
 
   return (
-    <Modal title={`Links: ${ownerLabel}`} onClose={onClose}>
+    <Modal title="Links" subtitle={ownerLabel} dialogLabel={`Links: ${ownerLabel}`} onClose={onClose}>
       {links.length === 0 ? (
-        <p className="text-sm text-[var(--muted)]">No links yet.</p>
+        <p className="mb-4 text-[13px] text-[var(--muted)]">No links yet. Add the pages you open for this item.</p>
       ) : (
-        <ul className="mb-3 divide-y divide-[var(--line)] rounded-md border border-[var(--line)]">
+        <ul className="mb-2 divide-y divide-[var(--line)] overflow-hidden rounded-md border border-[var(--line)]">
           {links.map((link) => (
-            <li key={link.id} className="flex items-center gap-2 px-3 py-2 text-sm">
+            <li key={link.id} className="lockedin-row flex items-center gap-2 py-1 pl-3 pr-1 text-sm">
               <a
                 href={link.url}
                 target="_blank"
@@ -47,16 +49,17 @@ export function LinksModal({
                 type="button"
                 onClick={() => onDelete(link.id)}
                 aria-label={`Delete link ${link.name}`}
-                className="text-xs text-[var(--muted)] hover:text-[var(--bad)]"
+                title="Delete link"
+                className={`${BTN_ICON} lockedin-on-hover hover:text-[var(--bad)]`}
               >
-                Delete
+                <TrashIcon size={14} />
               </button>
             </li>
           ))}
         </ul>
       )}
 
-      {links.length > 0 && (
+      {links.length > 1 && (
         <button
           type="button"
           onClick={() => {
@@ -64,9 +67,9 @@ export function LinksModal({
               window.open(link.url, "_blank", "noopener,noreferrer");
             }
           }}
-          className="mb-3 w-full rounded-md border border-[var(--line)] px-3 py-2 text-sm text-[var(--fg)] hover:border-[var(--muted)]"
+          className={`${BTN_QUIET} -ml-2 mb-4`}
         >
-          Open all
+          Open all {links.length} links
         </button>
       )}
 
@@ -88,7 +91,7 @@ export function LinksModal({
           onChange={(event) => setName(event.target.value)}
           placeholder="Link name"
           aria-label="Link name"
-          className="w-full rounded-md border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--fg)] placeholder:text-[var(--muted)]"
+          className={INPUT}
         />
         <input
           type="text"
@@ -96,13 +99,13 @@ export function LinksModal({
           onChange={(event) => setUrl(event.target.value)}
           placeholder="URL, like example.com"
           aria-label="Link URL"
-          className="w-full rounded-md border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--fg)] placeholder:text-[var(--muted)]"
+          className={INPUT}
         />
         {error && <p className="text-sm text-[var(--bad)]">{error}</p>}
         <button
           type="submit"
           disabled={name.trim() === "" || url.trim() === ""}
-          className="w-full rounded-md border border-[var(--line)] px-3 py-2 text-sm text-[var(--fg)] hover:border-[var(--muted)] disabled:opacity-50"
+          className={`${BTN_PRIMARY} w-full`}
         >
           Add link
         </button>

@@ -1,6 +1,8 @@
 // Popup (SPEC 8.17): connection status, current session time left, the
 // Dashboard URL field saved to chrome.storage.local, and an Open dashboard
 // button. It talks to the service worker directly with runtime messaging.
+// UI polish (Oct 2026): the URL field lives under "Settings", folded away
+// once a URL is saved, so the popup leads with the timer and the button.
 
 import { isBlocking, type LockMode } from "./lib/session";
 
@@ -37,22 +39,25 @@ async function refreshState(): Promise<void> {
   const labelEl = document.getElementById("session-label");
   const statusDot = document.getElementById("status-dot");
   const statusText = document.getElementById("status-text");
+  const idleText = document.getElementById("idle-text");
   if (!sessionBox || !timeEl || !labelEl || !statusDot || !statusText) return;
 
   const data = dataRecord(await send("getState"));
   const session = data ? (data.session as Record<string, unknown> | null) : null;
   if (session && typeof session.endAtMs === "number") {
     sessionBox.hidden = false;
+    if (idleText) idleText.hidden = true;
     timeEl.textContent = clock(session.endAtMs - Date.now());
     const lockMode = typeof session.lockMode === "string" && isLockMode(session.lockMode) ? session.lockMode : null;
-    labelEl.textContent = lockMode
-      ? `${LOCK_LABEL[lockMode]}${isBlocking(lockMode) ? " on" : ""}`
-      : "Session running";
+    const lockText = lockMode ? `${LOCK_LABEL[lockMode]}${isBlocking(lockMode) ? " on" : ""}` : "Session running";
+    const label = typeof session.label === "string" && session.label !== "" ? session.label : null;
+    labelEl.textContent = label ? `${label} · ${lockText}` : lockText;
   } else {
     sessionBox.hidden = true;
+    if (idleText) idleText.hidden = false;
   }
   statusDot.className = "dot ok";
-  statusText.textContent = "Extension running";
+  statusText.textContent = "Running";
 }
 
 async function renderTimeLoop(): Promise<void> {
@@ -70,6 +75,9 @@ async function loadOrigin(): Promise<void> {
   const stored = await chrome.storage.local.get("dashboardOrigin");
   const origin = (stored.dashboardOrigin as string | undefined) ?? "";
   originInput.value = origin;
+  // First run: open Settings so the URL field is the first thing seen.
+  const settings = document.getElementById("settings") as HTMLDetailsElement | null;
+  if (settings) settings.open = origin === "";
 }
 
 async function saveOrigin(): Promise<void> {
@@ -96,6 +104,8 @@ async function openDashboard(): Promise<void> {
   if (!origin) {
     saveNote.classList.add("error");
     saveNote.textContent = "Save the dashboard URL first.";
+    const settings = document.getElementById("settings") as HTMLDetailsElement | null;
+    if (settings) settings.open = true;
     return;
   }
   await chrome.tabs.create({ url: origin });

@@ -20,6 +20,8 @@ import {
   type EodGetResponse,
   type EodSendResponse,
 } from "@/lib/eod-modal-state";
+import { Modal } from "./modal";
+import { BTN_PRIMARY, TOAST } from "./ui";
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -150,35 +152,22 @@ export default function EodSection({ buttonClassName }: { buttonClassName?: stri
       </button>
 
       {open ? (
-        <div
-          className="fixed inset-0 z-40 bg-black/60"
-          onClick={() => dispatch({ type: "close" })}
-        >
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-label="End of day report preview"
-            onClick={(event) => event.stopPropagation()}
-            className="absolute inset-x-4 top-1/2 mx-auto max-h-[85vh] max-w-2xl -translate-y-1/2 overflow-y-auto rounded-lg border border-[var(--line)] bg-[var(--surface-2)] p-6 shadow-[0_6px_16px_rgba(0,0,0,0.3)]"
-          >
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <h2 className="text-lg font-semibold text-[var(--fg)]">LockedIn end of day report</h2>
-                {state.context ? (
-                  <p className="text-sm text-[var(--muted)]">{state.context.dateLabel}</p>
-                ) : null}
-              </div>
-              <button
-                type="button"
-                aria-label="Close the end of day preview"
-                onClick={() => dispatch({ type: "close" })}
-                className="rounded-md border border-[var(--line)] px-2 py-1 text-sm text-[var(--muted)] transition-colors hover:text-[var(--fg)]"
-              >
-                X
+        <Modal
+          title="End of day report"
+          subtitle={state.context ? state.context.dateLabel : undefined}
+          dialogLabel="End of day report preview"
+          closeLabel="Close the end of day preview"
+          size="lg"
+          onClose={() => dispatch({ type: "close" })}
+          footer={
+            data && state.context ? (
+              <button type="button" onClick={send} disabled={isSending} className={BTN_PRIMARY}>
+                {isSending ? "Sending..." : "Send report"}
               </button>
-            </div>
-
-            {state.status === "loading" ? <p className="mt-6 text-sm text-[var(--muted)]">Loading the report...</p> : null}
+            ) : undefined
+          }
+        >
+            {state.status === "loading" ? <p className="mt-2 text-sm text-[var(--muted)]">Loading the report...</p> : null}
 
             {state.status === "error" ? (
               <div className="mt-6">
@@ -285,28 +274,13 @@ export default function EodSection({ buttonClassName }: { buttonClassName?: stri
                   </p>
                 ) : null}
 
-                <div className="mt-6 flex justify-end">
-                  <button
-                    type="button"
-                    onClick={send}
-                    disabled={isSending}
-                    className="rounded-md bg-[var(--accent-strong)] px-4 py-2 text-sm font-medium text-[var(--on-accent)] transition-colors hover:bg-[var(--accent-strong-hover)] disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    {isSending ? "Sending..." : "Send"}
-                  </button>
-                </div>
               </div>
             ) : null}
-          </div>
-        </div>
+        </Modal>
       ) : null}
 
       {state.toast ? (
-        <div
-          role="status"
-          aria-live="polite"
-          className="fixed bottom-6 right-6 z-50 rounded-lg border border-[var(--line)] bg-[var(--surface-2)] px-4 py-3 text-sm text-[var(--fg)] shadow-[0_6px_16px_rgba(0,0,0,0.3)]"
-        >
+        <div role="status" aria-live="polite" className={TOAST}>
           {state.toast}
         </div>
       ) : null}
