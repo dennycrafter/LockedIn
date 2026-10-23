@@ -176,6 +176,14 @@ create table day_reviews (
   created_at timestamptz not null default now()
 );
 
+-- Board (Oct 2026): the ideas whiteboard. One row, id 'main'. scene holds
+-- the Excalidraw elements, pasted images and the last view as JSON.
+create table boards (
+  id text primary key default 'main',
+  scene jsonb not null default '{}'::jsonb,
+  updated_at timestamptz not null default now()
+);
+
 -- Lock everything down: RLS on, no policies, so only the service role (server) can read/write.
 do $$ declare t text; begin
   for t in select tablename from pg_tables where schemaname = 'public' loop

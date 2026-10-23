@@ -8,7 +8,7 @@
 import { useEffect, useRef } from "react";
 import { CloseIcon } from "./icons";
 
-export const MODAL_OVERLAY = "fixed inset-0 z-40 flex items-start justify-center overflow-y-auto bg-black/60 px-4 pb-6 pt-[8vh]";
+export const MODAL_OVERLAY = "fixed inset-0 z-40 flex items-start justify-center overflow-y-auto bg-[var(--overlay)] px-4 pb-6 pt-[8vh]";
 
 export function Modal({
   title,
@@ -65,7 +65,7 @@ export function Modal({
         aria-modal="true"
         aria-label={dialogLabel ?? title}
         tabIndex={-1}
-        className={`flex max-h-[84vh] outline-none w-full flex-col rounded-lg border border-[var(--line)] bg-[var(--surface-2)] shadow-[0_6px_16px_rgba(0,0,0,0.3)] ${
+        className={`flex max-h-[84vh] outline-none w-full flex-col rounded-lg border border-[var(--line)] bg-[var(--surface-2)] shadow-[var(--shadow)] ${
           size === "lg" ? "max-w-[640px]" : "max-w-[520px]"
         }`}
       >

@@ -16,6 +16,7 @@ import { runSyncCycle } from "@/lib/sync-cycle";
 import { UNDO_WINDOW_MS, hidePending, undoLabel } from "@/lib/pending-delete";
 import { toExtensionTree } from "@/lib/extension-tree";
 import { BlockedSitesPanel } from "./blocked-sites-panel";
+import { BoardView } from "./board-view";
 import { CelebrationOverlay } from "./celebration-overlay";
 import EodSection from "./EodPreviewModal";
 import { ChevronIcon } from "./icons";
@@ -30,12 +31,25 @@ import { StartSessionDialog } from "./start-session-dialog";
 import { StuckModal } from "./stuck-modal";
 import { StatsStrip } from "./stats-strip";
 import { TimeStudyPanel } from "./time-study-panel";
+import { ThemeToggle } from "./theme-toggle";
 import { TimeStudyPromptCard } from "./time-study-prompt";
 import { PlanPanel } from "./tomorrow-plan-panel";
 import { BTN_PRIMARY, BTN_QUIET, BTN_SECONDARY, CARD, CARD_TITLE, RowMenu, TOAST } from "./ui";
 import WindDownSection from "./wind-down-modal";
 
 type ConnectionState = "checking" | "connected" | "disconnected";
+
+// Top bar sections (Oct 2026). The Board lives at #board so a refresh or the
+// back button keeps you where you were.
+type View = "today" | "board";
+const VIEWS: ReadonlyArray<{ id: View; label: string }> = [
+  { id: "today", label: "Today" },
+  { id: "board", label: "Board" },
+];
+
+function viewFromHash(): View {
+  return window.location.hash === "#board" ? "board" : "today";
+}
 
 const JSON_HEADERS = { "Content-Type": "application/json" };
 
@@ -54,6 +68,7 @@ function connectionDot(state: ConnectionState): { background: string; text: stri
 
 export function LockedInApp({ initialData }: { initialData: DashboardData }) {
   const [data, setData] = useState<DashboardData>(initialData);
+  const [section, setSection] = useState<View>("today");
   const [session, setSession] = useState<ExtensionSession | null>(null);
   const [softUnlockAt, setSoftUnlockAt] = useState<number | null>(null);
   const [connection, setConnection] = useState<ConnectionState>("checking");
@@ -93,6 +108,19 @@ export function LockedInApp({ initialData }: { initialData: DashboardData }) {
   const [timeStudyError, setTimeStudyError] = useState<string | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastSessionRef = useRef<ExtensionSession | null>(null);
+
+  useEffect(() => {
+    const sync = () => setSection(viewFromHash());
+    sync();
+    window.addEventListener("hashchange", sync);
+    return () => window.removeEventListener("hashchange", sync);
+  }, []);
+
+  const openView = useCallback((next: View) => {
+    setSection(next);
+    const url = next === "board" ? "#board" : `${window.location.pathname}${window.location.search}`;
+    window.history.pushState(null, "", url);
+  }, []);
 
   const showToast = useCallback((message: string, action?: ToastState["action"]) => {
     setToast({ message, action });
@@ -691,13 +719,36 @@ export function LockedInApp({ initialData }: { initialData: DashboardData }) {
         <div className={`mx-auto flex h-14 max-w-[1760px] items-center gap-2 sm:h-16 ${GUTTER}`}>
           <span className="flex items-center gap-2.5 text-[17px] font-semibold text-[var(--fg)]">
             {/* Brand mark: the pink eyes icon, same file as the favicon. */}
-            <Image src="/icon.png" alt="" width={32} height={32} priority className="h-8 w-8 rounded-[6px] sm:h-[34px] sm:w-[34px]" />
-            LockedIn
+            <Image src="/icon.png" alt="" width={32} height={32} priority className="h-8 w-8 shrink-0 rounded-[6px] sm:h-[34px] sm:w-[34px]" />
+            <span className="hidden sm:inline">LockedIn</span>
           </span>
+          {/* Section tabs: white underline on the active one (design rules). */}
+          <nav aria-label="Sections" className="ml-3 flex h-full items-stretch gap-1 sm:ml-6 sm:gap-2">
+            {VIEWS.map((item) => {
+              const active = section === item.id;
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  aria-current={active ? "page" : undefined}
+                  onClick={() => openView(item.id)}
+                  className={`relative px-2 text-sm font-medium transition-colors ${
+                    active ? "text-[var(--fg)]" : "text-[var(--muted)] hover:text-[var(--fg)]"
+                  }`}
+                >
+                  {item.label}
+                  {active && <span aria-hidden className="absolute inset-x-2 -bottom-px h-0.5 rounded-full bg-[var(--fg)]" />}
+                </button>
+              );
+            })}
+          </nav>
           <div className="ml-auto flex items-center gap-1 sm:gap-2">
-            <button type="button" onClick={() => setStuckRequest((n) => n + 1)} className={`${BTN_QUIET} hidden sm:inline-flex`}>
-              I&apos;m stuck
-            </button>
+            {/* Wrapped so "hidden" is not overridden by the button's own display class. On phones it lives in Tools. */}
+            <span className="hidden sm:block">
+              <button type="button" onClick={() => setStuckRequest((n) => n + 1)} className={BTN_QUIET}>
+                I&apos;m stuck
+              </button>
+            </span>
             <RowMenu
               label="Tools"
               buttonClassName={`${BTN_QUIET} text-[var(--fg)]`}
@@ -714,6 +765,7 @@ export function LockedInApp({ initialData }: { initialData: DashboardData }) {
                 { label: "Edit blocked sites", onSelect: () => setTool("sites") },
               ]}
             />
+            <ThemeToggle />
             <span className="ml-1 sm:ml-2">
               <ProfileMenu
                 settings={data.settings}
@@ -761,7 +813,12 @@ export function LockedInApp({ initialData }: { initialData: DashboardData }) {
         }}
       />
 
-      <main className={`mx-auto flex max-w-[1760px] flex-col gap-5 pb-10 pt-5 sm:gap-6 sm:pt-6 ${GUTTER}`}>
+      {section === "board" && <BoardView />}
+
+      <main
+        hidden={section === "board"}
+        className={`mx-auto flex max-w-[1760px] flex-col gap-5 pb-10 pt-5 sm:gap-6 sm:pt-6 ${GUTTER}`}
+      >
         {connection === "disconnected" && (
           <div
             role="status"
