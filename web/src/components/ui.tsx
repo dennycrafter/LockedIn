@@ -33,7 +33,7 @@ export const CARD_TITLE = "text-base font-semibold text-[var(--fg)]";
 export const SECTION_LABEL = "text-xs font-medium uppercase tracking-wide text-[var(--muted)]";
 /** Toasts all appear in one place: bottom centre. */
 export const TOAST =
-  "fixed bottom-5 left-1/2 z-50 flex max-w-[calc(100vw-32px)] -translate-x-1/2 items-center gap-3 rounded-lg border border-[var(--line)] bg-[var(--surface-2)] px-4 py-2.5 text-sm text-[var(--fg)] shadow-[0_6px_16px_rgba(0,0,0,0.3)]";
+  "fixed bottom-5 left-1/2 z-50 flex max-w-[calc(100vw-32px)] -translate-x-1/2 items-center gap-3 rounded-lg border border-[var(--line)] bg-[var(--surface-2)] px-4 py-2.5 text-sm text-[var(--fg)] shadow-[var(--shadow)]";
 
 /**
  * One strip of choices split by 1px lines (minutes, lock mode, styles).
@@ -170,7 +170,7 @@ export function RowMenu({
               setOpen(false);
             }
           }}
-          className={`absolute right-0 z-30 min-w-44 whitespace-nowrap rounded-lg border border-[var(--line)] bg-[var(--surface-2)] p-1 shadow-[0_6px_16px_rgba(0,0,0,0.3)] ${
+          className={`absolute right-0 z-30 min-w-44 whitespace-nowrap rounded-lg border border-[var(--line)] bg-[var(--surface-2)] p-1 shadow-[var(--shadow)] ${
             up ? "bottom-full mb-1" : "top-full mt-1"
           }`}
         >

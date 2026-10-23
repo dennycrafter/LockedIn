@@ -1,8 +1,14 @@
 @import "tailwindcss";
 
-/* Design tokens per SPEC section 10 (dark only). */
+/* Design tokens per SPEC section 10. Dark is the base; light mode (Oct 2026)
+   swaps the same tokens when <html data-theme="light">. The theme script in
+   layout.tsx sets data-theme before first paint from the saved choice or the
+   system setting, so there is no flash. */
 :root {
   color-scheme: dark;
+  /* Pop-ups and the dimmed backdrop behind windows. */
+  --shadow: 0 6px 16px rgba(0, 0, 0, 0.3);
+  --overlay: rgba(0, 0, 0, 0.6);
   /* Brand palette from the eyes logo: black, neutral greys, one pink.
      Greys are neutral (no blue tint) so they sit with the logo's black. */
   --bg: #0a0a0a;
@@ -24,6 +30,32 @@
      (about 7:1 contrast). Hover lightens. --accent stays for rings. */
   --accent-strong: #ff5c8a;
   --accent-strong-hover: #ff85a8;
+  --on-accent: #000000;
+}
+
+/* Light mode: same four-grey system, flipped. Page is a soft grey so the
+   white boxes still read as boxes. Text colours are darkened versions of the
+   dark-mode ones so they pass contrast on white; the filled pink button keeps
+   black text like the logo. */
+:root[data-theme="light"] {
+  color-scheme: light;
+  --shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
+  --overlay: rgba(10, 10, 10, 0.35);
+  --bg: #f3f3f3;
+  --surface: #ffffff;
+  --surface-2: #f6f6f6;
+  --line: #e1e1e1;
+  --fg: #141414;
+  --muted: #6b6b6b;
+  --silver: #262626;
+  --accent: #ff5c8a;
+  --accent-ink: #d02e66;
+  --ok: #1e9a46;
+  --warn: #9a7400;
+  --bad: #d92d20;
+  --info: #1f6fd1;
+  --accent-strong: #ff5c8a;
+  --accent-strong-hover: #ff7aa0;
   --on-accent: #000000;
 }
 
@@ -223,4 +255,33 @@ body {
   to {
     opacity: 1;
   }
+}
+
+/* Board tab (Oct 2026): Excalidraw in LockedIn colours. Its purple becomes
+   our pink, its panels use our surfaces and outline, and it uses our system
+   font. Selector repeats .excalidraw so it beats the library's own theme
+   rules in both light and dark. */
+.lockedin-board .excalidraw.excalidraw,
+.lockedin-board .excalidraw.excalidraw.theme--dark {
+  --ui-font: -apple-system, "Segoe UI", Inter, system-ui, sans-serif;
+  --color-primary: var(--accent-ink);
+  --color-primary-darker: var(--accent-ink);
+  --color-primary-darkest: var(--accent-ink);
+  --color-primary-hover: var(--accent-strong-hover);
+  --color-primary-light: color-mix(in srgb, var(--accent) 22%, var(--surface));
+  --color-primary-light-darker: color-mix(in srgb, var(--accent) 32%, var(--surface));
+  --island-bg-color: var(--surface);
+  --default-bg-color: var(--surface);
+  --input-bg-color: var(--bg);
+  --popup-bg-color: var(--surface-2);
+  --default-border-color: var(--line);
+  --sidebar-border-color: var(--line);
+  --color-surface-lowest: var(--bg);
+  --color-surface-low: var(--surface-2);
+  --color-surface-mid: var(--surface-2);
+  --color-surface-high: var(--line);
+  --color-surface-primary-container: color-mix(in srgb, var(--accent) 20%, var(--surface));
+  --color-on-primary-container: var(--fg);
+  --border-radius-md: 6px;
+  --border-radius-lg: 8px;
 }

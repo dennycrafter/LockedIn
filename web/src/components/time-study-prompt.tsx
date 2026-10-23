@@ -68,7 +68,7 @@ export function TimeStudyPromptCard({
     <div
       role="dialog"
       aria-label="Time study check-in"
-      className="fixed bottom-5 right-5 z-40 w-[min(20rem,calc(100vw-40px))] rounded-lg border border-[var(--line)] bg-[var(--surface-2)] p-4 shadow-[0_6px_16px_rgba(0,0,0,0.3)]"
+      className="fixed bottom-5 right-5 z-40 w-[min(20rem,calc(100vw-40px))] rounded-lg border border-[var(--line)] bg-[var(--surface-2)] p-4 shadow-[var(--shadow)]"
     >
       <div className="flex items-start justify-between gap-2">
         <div>

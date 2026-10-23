@@ -57,7 +57,7 @@ export function CelebrationOverlay({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--overlay)] p-4"
       onClick={onClose}
       role="presentation"
     >
@@ -66,7 +66,7 @@ export function CelebrationOverlay({
         aria-modal="true"
         aria-label="All items done"
         onClick={(event) => event.stopPropagation()}
-        className="lockedin-celebration relative flex w-full max-w-lg flex-col items-center gap-6 rounded-lg border border-[var(--line)] bg-[var(--surface-2)] px-6 py-10 text-center shadow-[0_6px_16px_rgba(0,0,0,0.3)]"
+        className="lockedin-celebration relative flex w-full max-w-lg flex-col items-center gap-6 rounded-lg border border-[var(--line)] bg-[var(--surface-2)] px-6 py-10 text-center shadow-[var(--shadow)]"
       >
         <span className="lockedin-shockwave" aria-hidden />
         <span className="lockedin-sparks" aria-hidden>

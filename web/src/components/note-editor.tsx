@@ -144,7 +144,7 @@ export function NoteEditor({
           title="Attach selection to a task"
           onMouseDown={(event) => event.preventDefault()}
           onClick={() => setAttachOpen(true)}
-          className="fixed z-30 h-7 w-7 rounded-md border border-[var(--line)] bg-[var(--surface-2)] text-sm text-[var(--fg)] shadow-[0_6px_16px_rgba(0,0,0,0.3)] hover:border-[var(--accent-ink)]"
+          className="fixed z-30 h-7 w-7 rounded-md border border-[var(--line)] bg-[var(--surface-2)] text-sm text-[var(--fg)] shadow-[var(--shadow)] hover:border-[var(--accent-ink)]"
           style={{ left: Math.max(4, spot.x + 8), top: Math.max(4, spot.y + 10) }}
         >
           +

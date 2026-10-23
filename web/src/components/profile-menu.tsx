@@ -113,7 +113,7 @@ export function ProfileMenu({
 
       {open && (
         <div
-          className={`absolute ${align === "left" ? "left-0" : "right-0"} top-full z-30 mt-2 w-[min(19rem,calc(100vw-32px))] rounded-lg border border-[var(--line)] bg-[var(--surface-2)] p-4 shadow-[0_6px_16px_rgba(0,0,0,0.3)]`}
+          className={`absolute ${align === "left" ? "left-0" : "right-0"} top-full z-30 mt-2 w-[min(19rem,calc(100vw-32px))] rounded-lg border border-[var(--line)] bg-[var(--surface-2)] p-4 shadow-[var(--shadow)]`}
         >
           {statusText && (
             <p className="mb-3 flex items-center gap-2 border-b border-[var(--line)] pb-3 text-[13px] text-[var(--muted)]">
