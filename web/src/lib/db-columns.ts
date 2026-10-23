@@ -103,7 +103,7 @@ export function parseKnownColumns(files: SqlFile[]): Set<string> {
 
 function stripLineComments(sql: string): string {
   return sql
-    .split("\n")
+    .split(/\r?\n/)
     .map((line) => line.replace(/--.*$/, ""))
     .join("\n");
 }
